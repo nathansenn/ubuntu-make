@@ -31,6 +31,11 @@ from umake.network.download_center import DownloadCenter, DownloadItem
 from umake.tools import ChecksumType, Checksum
 
 
+def _progress_dicts(report):
+    """Return report calls that carry a progress mapping (skip the completion sentinel)."""
+    return [c for c in report.call_args_list if c[0] and isinstance(c[0][0], dict)]
+
+
 class TestDownloadCenter(LoggedTestCase):
     """This will test the download center by sending one or more download requests"""
 
@@ -292,8 +297,9 @@ class TestDownloadCenter(LoggedTestCase):
         DownloadCenter([request], self.callback, report=report)
         self.wait_for_callback(self.callback)
 
-        self.assertEqual(report.call_count, 2)
-        self.assertEqual(report.call_args_list,
+        progress = _progress_dicts(report)
+        self.assertEqual(len(progress), 2)
+        self.assertEqual(progress,
                          [call({self.build_server_address(filename): {'size': filesize, 'current': 0}}),
                           call({self.build_server_address(filename): {'size': filesize, 'current': filesize}})])
 
@@ -311,9 +317,10 @@ class TestDownloadCenter(LoggedTestCase):
         finally:
             DownloadCenter.BLOCK_SIZE = original_block_size
 
-        self.assertEqual(report.call_count, 4)
+        progress = _progress_dicts(report)
+        self.assertEqual(len(progress), 4)
         url = self.build_server_address(filename)
-        self.assertEqual(report.call_args_list,
+        self.assertEqual(progress,
                          [call({url: {'size': filesize, 'current': 0}}),
                           call({url: {'size': filesize, 'current': 4096}}),
                           call({url: {'size': filesize, 'current': 8192}}),
@@ -346,18 +353,19 @@ class TestDownloadCenter(LoggedTestCase):
         DownloadCenter(requests, self.callback, report=report)
         self.wait_for_callback(self.callback)
 
-        self.assertGreaterEqual(report.call_count, 3)
+        progress = _progress_dicts(report)
+        self.assertGreaterEqual(len(progress), 3)
         # ensure that first call only contains one file
-        callback_args, callback_kwargs = report.call_args_list[0]
+        callback_args, callback_kwargs = progress[0]
         map_result = callback_args[0]
         self.assertEqual(len(map_result), 1, str(map_result))
-        # ensure that last call is what we expect
+        # ensure that last progress call is what we expect
         result_dict = {}
         for filename in ("biggerfile", "simplefile"):
             file_size = getsize(join(self.server_dir, filename))
             result_dict[self.build_server_address(filename)] = {'size': file_size,
                                                                 'current': file_size}
-        self.assertEqual(report.call_args, call(result_dict))
+        self.assertEqual(progress[-1], call(result_dict))
         self.assertEqual(self.callback.call_count, 1, "Global done callback is only called once")
 
     def test_404_url(self):
@@ -479,8 +487,9 @@ class TestDownloadCenter(LoggedTestCase):
                              result.fd.read())
         self.assertIsNone(result.buffer)
         self.assertIsNone(result.error)
-        self.assertEqual(report.call_count, 2)
-        self.assertEqual(report.call_args_list,
+        progress = _progress_dicts(report)
+        self.assertEqual(len(progress), 2)
+        self.assertEqual(progress,
                          [call({self.build_server_address(filename): {'size': -1, 'current': 0}}),
                           call({self.build_server_address(filename): {'size': -1, 'current': 12}})])
 
@@ -537,7 +546,9 @@ class TestDownloadCenterSecure(LoggedTestCase):
         # prepare the cert and set it as the trusted system context
         os.environ['REQUESTS_CA_BUNDLE'] = join(get_data_dir(), 'localhost.pem')
         # Disable SubjectAltNameWarning for custom localhost test certificate
-        urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
+        san_warning = getattr(urllib3.exceptions, "SubjectAltNameWarning", None)
+        if san_warning is not None:
+            urllib3.disable_warnings(san_warning)
         try:
             DownloadCenter([request], self.callback)
             TestDownloadCenter.wait_for_callback(self, self.callback)
@@ -559,7 +570,9 @@ class TestDownloadCenterSecure(LoggedTestCase):
         request = DownloadItem(url, None)
         os.environ['REQUESTS_CA_BUNDLE'] = join(get_data_dir(), 'localhost.pem')
         # Disable SubjectAltNameWarning for custom localhost test certificate
-        urllib3.disable_warnings(urllib3.exceptions.SubjectAltNameWarning)
+        san_warning = getattr(urllib3.exceptions, "SubjectAltNameWarning", None)
+        if san_warning is not None:
+            urllib3.disable_warnings(san_warning)
         try:
             DownloadCenter([request], self.callback)
             TestDownloadCenter.wait_for_callback(self, self.callback)

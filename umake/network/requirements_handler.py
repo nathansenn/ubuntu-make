@@ -60,6 +60,10 @@ class RequirementsHandler(object, metaclass=Singleton):
             self._cache = apt.Cache()
         return self._cache
 
+    @cache.setter
+    def cache(self, value):
+        self._cache = value
+
     def is_bucket_installed(self, bucket):
         """Check if the bucket is installed
 

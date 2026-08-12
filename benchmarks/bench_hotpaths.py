@@ -9,7 +9,6 @@ Run from the repo root:  python3 benchmarks/bench_hotpaths.py
 from __future__ import annotations
 
 import hashlib
-import io
 import os
 import re
 import shutil

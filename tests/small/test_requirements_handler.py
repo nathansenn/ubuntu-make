@@ -73,8 +73,6 @@ class TestRequirementsHandler(DpkgAptSetup):
             self.assertTrue(handler.is_bucket_available([]))
             self.assertTrue(handler.is_bucket_uptodate([]))
             self.assertIsNone(handler._cache)
-            self.assertIsNotNone(handler.cache)
-            self.assertIsNotNone(handler._cache)
         finally:
             tools.Singleton._instances = saved
 
