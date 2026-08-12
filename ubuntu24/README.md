@@ -24,12 +24,28 @@ Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks
 | zlib CRC-32 PCLMUL folding (ifunc + CPUID) | **4.07×** (24.6 vs 6.0 GB/s) | KEEP |
 | zlib Adler-32 SSSE3 (ifunc + CPUID) | **6.69×** (24.0 vs 3.6 GB/s) | KEEP |
 | gzip `updcrc` PCLMUL | **41.8×** (20.9 vs 0.50 GB/s) | KEEP |
+| gzip `UNALIGNED_OK` on amd64 | Ubuntu `debian/rules` tested `$(buildarch)` which is unset; fix + `tailor.h` | KEEP |
 | Python `zlib.decompress` via new `libz` | **1.10×** (666 vs 606 MB/s) | KEEP |
 | coreutils `wc` `BUFFER_SIZE` 16 KiB → 256 KiB | **1.50×** read throughput vs 16 KiB | KEEP |
 | coreutils `IO_BUFSIZE` 128 KiB → 256 KiB | **1.02×** (matches upstream comment table) | KEEP |
+| coreutils `tr`/`head` 8 KiB → 256 KiB | same I/O plateau as `wc` | KEEP |
 | grep `INITIAL_BUFSIZE` 96 KiB → 256 KiB | fewer syscalls; I/O already plateaued | KEEP |
 
 `__builtin_cpu_supports()` returns 0 inside GNU ifunc resolvers (libgcc CPU init has not run yet). Resolvers use **CPUID leaf 1** instead. Direct calls to the SIMD kernels were ~4×/6×; ifunc with the builtin stayed at scalar speed until that fix.
+
+## Surveyed and left alone (already fast or no proven win)
+
+| Area | Finding |
+|---|---|
+| zlib AVX2 `compare256` / `longest_match` | **DISCARD** — 0.91× on mixed Python/stdlib corpus (short matches); 1.06× only on highly repetitive text |
+| xz/liblzma CRC | Already CPUID-dispatches CLMUL |
+| zstd 1.5.5 | `DYNAMIC_BMI2` + ASM already on (hundreds of `tzcnt`/`pdep`) |
+| OpenSSL / `sha256sum` / `md5sum` | libcrypto + SHA-NI |
+| `cksum` | PCLMUL already (`cksum: using pclmul hardware support`) |
+| bzip2 | Scalar by design; no production SIMD in 1.0.8 |
+| lz4 1.9.4 | Compiler SSE2 + `tzcnt`; no extra library SIMD |
+| make 4.3 / bash 5.2 | Already has Jenkins hash; not a CPU bottleneck |
+| glibc `memcpy`/`memchr` | Already AVX2/AVX-512 ifunc |
 
 ## Apply
 

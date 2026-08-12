@@ -25,8 +25,8 @@ diff -Naur zlib-1.3.dfsg/adler32.c zlib-1.3.dfsg/adler32.c
  uLong ZEXPORT adler32(uLong adler, const Bytef *buf, uInt len) {
      return adler32_z(adler, buf, len);
 diff -Naur zlib-1.3.dfsg/CMakeLists.txt zlib-1.3.dfsg/CMakeLists.txt
---- zlib-1.3.dfsg/CMakeLists.txt	2026-08-12 23:10:04.000000000 +0000
-+++ zlib-1.3.dfsg/CMakeLists.txt	2026-08-12 23:06:14.280750113 +0000
+--- zlib-1.3.dfsg/CMakeLists.txt	2026-08-12 23:35:45.000000000 +0000
++++ zlib-1.3.dfsg/CMakeLists.txt	2026-08-12 23:34:59.248974575 +0000
 @@ -196,6 +196,48 @@
              set(ZLIB_SRCS ${ZLIB_SRCS} ${ZLIB_POWER8} ${ZLIB_POWER9})
          endif()
@@ -77,8 +77,8 @@ diff -Naur zlib-1.3.dfsg/CMakeLists.txt zlib-1.3.dfsg/CMakeLists.txt
  
  # parse the full version number from zlib.h and include in ZLIB_FULL_VERSION
 diff -Naur zlib-1.3.dfsg/configure zlib-1.3.dfsg/configure
---- zlib-1.3.dfsg/configure	2026-08-12 23:10:04.000000000 +0000
-+++ zlib-1.3.dfsg/configure	2026-08-12 23:06:14.304750018 +0000
+--- zlib-1.3.dfsg/configure	2026-08-12 23:35:45.000000000 +0000
++++ zlib-1.3.dfsg/configure	2026-08-12 23:34:59.228974606 +0000
 @@ -882,6 +882,58 @@
    echo "Checking for attribute(ifunc) support... No." | tee -a configure.log
  fi
@@ -139,7 +139,7 @@ diff -Naur zlib-1.3.dfsg/configure zlib-1.3.dfsg/configure
  echo >> configure.log
  cat > $test.c <<EOF
 diff -Naur zlib-1.3.dfsg/contrib/README.contrib zlib-1.3.dfsg/contrib/README.contrib
---- zlib-1.3.dfsg/contrib/README.contrib	2026-08-12 23:10:04.000000000 +0000
+--- zlib-1.3.dfsg/contrib/README.contrib	2026-08-12 23:35:45.000000000 +0000
 +++ zlib-1.3.dfsg/contrib/README.contrib	2026-08-12 23:06:14.292750065 +0000
 @@ -59,6 +59,9 @@
          Hardware-accelerated deflate on IBM Z with DEFLATE CONVERSION CALL
@@ -437,7 +437,7 @@ diff -Naur zlib-1.3.dfsg/contrib/x86/crc32_z_resolver.c zlib-1.3.dfsg/contrib/x8
 +}
 diff -Naur zlib-1.3.dfsg/contrib/x86/x86.h zlib-1.3.dfsg/contrib/x86/x86.h
 --- zlib-1.3.dfsg/contrib/x86/x86.h	1970-01-01 00:00:00.000000000 +0000
-+++ zlib-1.3.dfsg/contrib/x86/x86.h	2026-08-12 23:07:59.972615191 +0000
++++ zlib-1.3.dfsg/contrib/x86/x86.h	2026-08-12 23:35:16.376949336 +0000
 @@ -0,0 +1,28 @@
 +/* x86_64 PCLMUL CRC32 and SSSE3 Adler-32 for Ubuntu zlib 1.3
 + * For conditions of distribution and use, see copyright notice in zlib.h
@@ -468,7 +468,7 @@ diff -Naur zlib-1.3.dfsg/contrib/x86/x86.h zlib-1.3.dfsg/contrib/x86/x86.h
 +
 +#endif
 diff -Naur zlib-1.3.dfsg/crc32.c zlib-1.3.dfsg/crc32.c
---- zlib-1.3.dfsg/crc32.c	2026-08-12 23:10:04.000000000 +0000
+--- zlib-1.3.dfsg/crc32.c	2026-08-12 23:35:45.000000000 +0000
 +++ zlib-1.3.dfsg/crc32.c	2026-08-12 23:03:29.894600268 +0000
 @@ -691,12 +691,12 @@
  #endif
@@ -507,8 +507,8 @@ diff -Naur zlib-1.3.dfsg/crc32.c zlib-1.3.dfsg/crc32.c
  #endif
  
 diff -Naur zlib-1.3.dfsg/Makefile.in zlib-1.3.dfsg/Makefile.in
---- zlib-1.3.dfsg/Makefile.in	2026-08-12 23:10:04.000000000 +0000
-+++ zlib-1.3.dfsg/Makefile.in	2026-08-12 23:08:38.136663396 +0000
+--- zlib-1.3.dfsg/Makefile.in	2026-08-12 23:35:45.000000000 +0000
++++ zlib-1.3.dfsg/Makefile.in	2026-08-12 23:34:59.720973842 +0000
 @@ -176,6 +176,12 @@
  crc32_z_power8.o: $(SRCDIR)contrib/power/crc32_z_power8.c
  	$(CC) $(CFLAGS) -mcpu=power8 $(ZINC) -c -o $@ $(SRCDIR)contrib/power/crc32_z_power8.c

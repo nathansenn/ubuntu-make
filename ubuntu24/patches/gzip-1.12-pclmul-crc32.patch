@@ -143,3 +143,24 @@
          if (n) do {
              c = crc_32_tab[((int)c ^ (*s++)) & 0xff] ^ (c >> 8);
          } while (--n);
+--- gzip-1.12/tailor.h	2022-01-03 18:16:30.000000000 +0000
++++ gzip-1.12/tailor.h	2026-08-12 23:32:40.881290425 +0000
+@@ -206,3 +206,7 @@
+ #  define FALLTHROUGH __attribute__ ((__fallthrough__))
+ # endif
+ #endif
++
++#if defined(__x86_64__) && !defined(UNALIGNED_OK)
++# define UNALIGNED_OK
++#endif
+--- gzip-1.12/debian/rules	2025-01-27 16:56:44.000000000 +0000
++++ gzip-1.12/debian/rules	2026-08-12 23:35:33.796926458 +0000
+@@ -27,7 +27,7 @@
+ export DEFS=NO_ASM # Avoid TEXTRELs on i386
+ DEB_CFLAGS_MAINT_APPEND := -Wall
+ 
+-ifeq ($(buildarch), amd64)
++ifeq ($(DEB_HOST_ARCH),amd64)
+ DEB_CPPFLAGS_MAINT_APPEND := -DUNALIGNED_OK
+ endif
+ 

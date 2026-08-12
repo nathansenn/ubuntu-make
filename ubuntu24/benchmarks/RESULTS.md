@@ -40,10 +40,16 @@ Match OK (`val=aeeefab0` on the 32 MiB pattern).
 | 256 KiB (new) | 18.25 | **1.50×** |
 | 512 KiB | 17.99 | 1.48× |
 
-256 KiB is the plateau on this machine; 16 KiB is the clear loss.
+256 KiB is the plateau on this machine; 16 KiB is the clear loss. `tr` used `BUFSIZ` (8 KiB); `head` pipe path used `BUFSIZ`. Both now 256 KiB.
+
+## gzip `UNALIGNED_OK`
+
+Ubuntu `debian/rules` had `ifeq ($(buildarch), amd64)` but never sets `buildarch`, so `-DUNALIGNED_OK` was not applied. `tailor.h` now defines it on `__x86_64__`, and `debian/rules` tests `DEB_HOST_ARCH`.
 
 ## DISCARD
 
 - Replacing zlib's braided CRC with PCLMUL **without** a working ifunc: no win (stays at 6 GB/s).
-- Expecting gzip `-1` / deflate-6 to jump: those are LZ77/Huffman bound, not checksum bound.
+- zlib/gzip AVX2 or 8-byte `compare256` in `longest_match`: **0.91×** deflate-6 on a 24 MiB Python stdlib corpus (short matches dominate). Only helped highly repetitive dictionary text (~1.06×).
+- Expecting gzip `-1` / deflate-6 to jump from checksum SIMD: LZ77/Huffman bound.
+- xz CRC CLMUL, zstd BMI2, OpenSSL SHA-NI, coreutils `cksum` PCLMUL, glibc `memcpy`: already in Noble.
 - Kernel / OpenSSL SHA / AVX2 `wc -l`: already in Noble.

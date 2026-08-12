@@ -20,3 +20,25 @@
  
  #ifdef USE_AVX2_WC_LINECOUNT
  /* From wc_avx2.c */
+--- coreutils-9.4/src/tr.c	2023-08-29 11:39:27.000000000 +0000
++++ coreutils-9.4/src/tr.c	2026-08-12 23:32:56.317244378 +0000
+@@ -239,7 +239,7 @@
+    It is set in main and used there and in validate().  */
+ static bool translating;
+ 
+-static char io_buf[BUFSIZ];
++static char io_buf[256 * 1024];
+ 
+ static char const *const char_class_name[] =
+ {
+--- coreutils-9.4/src/head.c	2023-08-27 16:33:32.000000000 +0000
++++ coreutils-9.4/src/head.c	2026-08-12 23:32:56.213244679 +0000
+@@ -253,7 +253,7 @@
+   bool ok = true;
+ 
+ #ifndef HEAD_TAIL_PIPE_READ_BUFSIZE
+-# define HEAD_TAIL_PIPE_READ_BUFSIZE BUFSIZ
++# define HEAD_TAIL_PIPE_READ_BUFSIZE (256 * 1024)
+ #endif
+ #define READ_BUFSIZE HEAD_TAIL_PIPE_READ_BUFSIZE
+ 
