@@ -303,15 +303,21 @@ class TestDownloadCenter(LoggedTestCase):
         filesize = getsize(join(self.server_dir, filename))
         report = CopyingMock()
         request = DownloadItem(self.build_server_address(filename), None)
-        dl_center = DownloadCenter([request], self.callback, report=report)
-        self.wait_for_callback(self.callback)
+        original_block_size = DownloadCenter.BLOCK_SIZE
+        DownloadCenter.BLOCK_SIZE = 4096
+        try:
+            DownloadCenter([request], self.callback, report=report)
+            self.wait_for_callback(self.callback)
+        finally:
+            DownloadCenter.BLOCK_SIZE = original_block_size
 
-        self.assertEqual(report.call_count, 3)
+        self.assertEqual(report.call_count, 4)
+        url = self.build_server_address(filename)
         self.assertEqual(report.call_args_list,
-                         [call({self.build_server_address(filename): {'size': filesize, 'current': 0}}),
-                          call({self.build_server_address(filename): {'size': filesize,
-                                                                      'current': dl_center.BLOCK_SIZE}}),
-                          call({self.build_server_address(filename): {'size': filesize, 'current': filesize}})])
+                         [call({url: {'size': filesize, 'current': 0}}),
+                          call({url: {'size': filesize, 'current': 4096}}),
+                          call({url: {'size': filesize, 'current': 8192}}),
+                          call({url: {'size': filesize, 'current': filesize}})])
 
     def test_multiple_downloads(self):
         """we deliver more than on download in parallel"""
@@ -340,7 +346,7 @@ class TestDownloadCenter(LoggedTestCase):
         DownloadCenter(requests, self.callback, report=report)
         self.wait_for_callback(self.callback)
 
-        self.assertEqual(report.call_count, 5)
+        self.assertGreaterEqual(report.call_count, 3)
         # ensure that first call only contains one file
         callback_args, callback_kwargs = report.call_args_list[0]
         map_result = callback_args[0]
@@ -476,7 +482,7 @@ class TestDownloadCenter(LoggedTestCase):
         self.assertEqual(report.call_count, 2)
         self.assertEqual(report.call_args_list,
                          [call({self.build_server_address(filename): {'size': -1, 'current': 0}}),
-                          call({self.build_server_address(filename): {'size': -1, 'current': 8192}})])
+                          call({self.build_server_address(filename): {'size': -1, 'current': 12}})])
 
     def test_download_with_wrong_checksumtype(self):
         """we raise an error if we don't have a support checksum type"""

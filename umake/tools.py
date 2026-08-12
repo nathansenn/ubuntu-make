@@ -42,6 +42,11 @@ import yaml
 import yaml.scanner
 import yaml.parser
 
+try:
+    from yaml import CSafeLoader as YamlSafeLoader
+except ImportError:
+    from yaml import SafeLoader as YamlSafeLoader
+
 logger = logging.getLogger(__name__)
 
 # cache current arch. Shouldn't change in the life of the process ;)
@@ -93,7 +98,7 @@ class ConfigHandler(metaclass=Singleton):
         logger.debug("Opening {}".format(config_file))
         try:
             with open(config_file) as f:
-                self._config = yaml.safe_load(f)
+                self._config = yaml.load(f, Loader=YamlSafeLoader)
         except (TypeError, FileNotFoundError):
             logger.info("No configuration file found")
         except (yaml.scanner.ScannerError, yaml.parser.ParserError) as e:

@@ -28,7 +28,7 @@ import logging.config
 import os
 import sys
 from umake.frameworks import load_frameworks
-from umake.tools import MainLoop
+from umake.tools import MainLoop, YamlSafeLoader
 from .ui import cli
 import yaml
 
@@ -68,7 +68,7 @@ def _setup_logging(env_key='LOG_CFG', level=_default_log_level):
     if level == _default_log_level:
         if os.path.exists(path):
             with open(path, 'rt') as f:
-                config = yaml.load(f.read())
+                config = yaml.load(f, Loader=YamlSafeLoader)
             logging.config.dictConfig(config)
     logging.info("Logging level set to {}".format(logging.getLevelName(logging.root.getEffectiveLevel())))
 

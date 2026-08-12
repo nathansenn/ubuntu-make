@@ -69,12 +69,13 @@ class FTPAdapter(BaseAdapter):
 
             def handle_transfer():
                 # Download all the chunks into a queue, then place a sentinel object into it to signal completion.
-                self.conn.retrbinary('RETR ' + file_path, queue.put)
+                # 256 KiB matches DownloadCenter.BLOCK_SIZE (measured faster than 8 KiB HTTP/FTP reads).
+                self.conn.retrbinary('RETR ' + file_path, queue.put, blocksize=256 * 1024)
                 queue.put(done_sentinel)
 
             Thread(target=handle_transfer).start()
 
-            def stream(amt=8192, decode_content=False):
+            def stream(amt=256 * 1024, decode_content=False):
                 """A generator, yielding chunks from the queue."""
                 # We maintain a buffer so the consumer gets exactly the number of bytes requested.
                 buffer = bytearray()

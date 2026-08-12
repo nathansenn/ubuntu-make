@@ -62,6 +62,22 @@ class TestRequirementsHandler(DpkgAptSetup):
         other = RequirementsHandler()
         self.assertEqual(self.handler, other)
 
+    def test_empty_bucket_does_not_open_apt_cache(self):
+        """Empty package lists skip apt.Cache() construction."""
+        saved = dict(tools.Singleton._instances)
+        try:
+            tools.Singleton._instances.pop(RequirementsHandler, None)
+            handler = RequirementsHandler()
+            self.assertIsNone(handler._cache)
+            self.assertTrue(handler.is_bucket_installed([]))
+            self.assertTrue(handler.is_bucket_available([]))
+            self.assertTrue(handler.is_bucket_uptodate([]))
+            self.assertIsNone(handler._cache)
+            self.assertIsNotNone(handler.cache)
+            self.assertIsNotNone(handler._cache)
+        finally:
+            tools.Singleton._instances = saved
+
     def test_install(self):
         """Install one package"""
         self.handler.install_bucket(["testpackage"], lambda x: "", self.done_callback)

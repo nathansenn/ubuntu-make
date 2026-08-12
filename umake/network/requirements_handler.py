@@ -45,19 +45,28 @@ class RequirementsHandler(object, metaclass=Singleton):
     RequirementsResult = namedtuple("RequirementsResult", ["bucket", "error"])
 
     def __init__(self):
-        logger.info("Create a new apt cache")
-        self.cache = apt.Cache()
+        self._cache = None
         self.executor = futures.ThreadPoolExecutor(max_workers=1)
 
         # Set defaults for openjdk override
         self.jre_installed_version = None
         self.jdk_installed_version = None
 
+    @property
+    def cache(self):
+        """Lazily open the apt cache. Opening it is expensive and many frameworks have no packages."""
+        if self._cache is None:
+            logger.info("Create a new apt cache")
+            self._cache = apt.Cache()
+        return self._cache
+
     def is_bucket_installed(self, bucket):
         """Check if the bucket is installed
 
         The bucket is a list of packages to check if installed."""
-        logger.debug("Check if {} is installed".format(bucket))
+        if not bucket:
+            return True
+        logger.debug("Check if %s is installed", bucket)
         is_installed = True
         for pkg_name in bucket:
             if ' | ' in pkg_name:
@@ -83,6 +92,8 @@ class RequirementsHandler(object, metaclass=Singleton):
 
     def is_bucket_available(self, bucket):
         """Check if bucket available on the platform"""
+        if not bucket:
+            return True
         all_in_cache = True
         for pkg_name in bucket:
             if ' | ' in pkg_name:
@@ -116,7 +127,9 @@ class RequirementsHandler(object, metaclass=Singleton):
         """Check if the bucket is installed and up to date
 
         The bucket is a list of packages to check if installed."""
-        logger.debug("Check if {} is up to date".format(bucket))
+        if not bucket:
+            return True
+        logger.debug("Check if %s is up to date", bucket)
         is_installed_and_uptodate = True
         for pkg_name in bucket:
             if ' | ' in pkg_name:
