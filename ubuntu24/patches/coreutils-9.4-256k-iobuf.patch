@@ -1,0 +1,22 @@
+--- coreutils-9.4/src/ioblksize.h	2023-08-29 11:39:27.000000000 +0000
++++ coreutils-9.4/src/ioblksize.h	2026-08-12 23:03:33.786633114 +0000
+@@ -71,7 +71,7 @@
+    In the future we could use the above method if available
+    and default to io_blksize() if not.
+  */
+-enum { IO_BUFSIZE = 128 * 1024 };
++enum { IO_BUFSIZE = 256 * 1024 };
+ static inline idx_t
+ io_blksize (struct stat sb)
+ {
+--- coreutils-9.4/src/wc.c	2023-08-29 11:39:27.000000000 +0000
++++ coreutils-9.4/src/wc.c	2026-08-12 23:03:33.794633181 +0000
+@@ -51,7 +51,7 @@
+   proper_name ("David MacKenzie")
+ 
+ /* Size of atomic reads. */
+-#define BUFFER_SIZE (16 * 1024)
++#define BUFFER_SIZE (256 * 1024)
+ 
+ #ifdef USE_AVX2_WC_LINECOUNT
+ /* From wc_avx2.c */

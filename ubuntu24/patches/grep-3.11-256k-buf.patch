@@ -1,0 +1,11 @@
+--- grep-3.11/src/grep.c	2023-04-11 00:20:47.000000000 +0000
++++ grep-3.11/src/grep.c	2026-08-12 23:06:14.340749876 +0000
+@@ -883,7 +883,7 @@
+ static intmax_t totalnl;	/* Total newline count before lastnl. */
+ 
+ /* Initial buffer size, not counting slop. */
+-enum { INITIAL_BUFSIZE = 96 * 1024 };
++enum { INITIAL_BUFSIZE = 256 * 1024 };
+ 
+ /* Return VAL aligned to the next multiple of ALIGNMENT.  VAL can be
+    an integer or a pointer.  Both args must be free of side effects.  */
