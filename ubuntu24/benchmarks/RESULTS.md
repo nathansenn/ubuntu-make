@@ -121,3 +121,20 @@ End-to-end is memcmp-bound at ~3.1 GB/s on this host. The patch still cuts `read
 - python3.12 SHA/json: OpenSSL SHA-NI already; no json SIMD.
 - git SHA-NI / 256 KiB: `NO_OPENSSL=1` + SHA1DC by policy; mmap packs.
 - curl 16→256 KiB: API contract; TLS/socket bound.
+
+## Running-app memory (no new KEEP)
+
+See `MEMORY.md`. Headline measurements on this 4-CPU Xeon:
+
+| Test | Default | Treatment | vs default |
+|---|---|---|---|
+| 256 MiB first-touch, 2 MiB + `MADV_HUGEPAGE` | 0.0807 s | 0.0396 s | 2.04× fill only |
+| 128 MiB `read` + line `qsort` + THP (run 1) | 1.053 s | 1.282 s | **0.82×** |
+| glibc 8-thread alloc, `arena_max=1` | 83.8k kops/s | 26.3k | **0.31×** |
+| glibc `tcache_count=0` | 83.8k kops/s | 21.9k | **0.26×** |
+| Python 200k × 64 B, `PYTHONMALLOC=malloc` | 3950 kalloc/s | 7916 | 2.00× microbench only |
+| `malloc_trim` after 16 MiB / 256 KiB | 18328 kB RSS | 18328 kB | no change |
+| stock `sort -S 128M` 4M lines / 124 MiB | 3.23–3.30 s, 135 MiB RSS | — | already sized from physmem |
+
+THP needs 2 MiB alignment to form huge pages. It helps sequential fill and
+does not help GNU `sort`'s compare phase. No memory patch shipped.

@@ -1,0 +1,14 @@
+# Example only. Do not install this as /etc/environment.d/ or a global
+# systemd default. Ubuntu 24.04's glibc / THP / pymalloc defaults are
+# faster for mixed workloads than the knobs below (see
+# ubuntu24/benchmarks/MEMORY.md).
+#
+# Copy a *single* line into one service unit after measuring that service.
+
+# Memory-tight, mostly-idle daemon that is not allocator-bound:
+# GLIBC_TUNABLES=glibc.malloc.arena_max=2
+
+# Never set these globally:
+# GLIBC_TUNABLES=glibc.malloc.arena_max=1
+# GLIBC_TUNABLES=glibc.malloc.tcache_count=0
+# PYTHONMALLOC=malloc

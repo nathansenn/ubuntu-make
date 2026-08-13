@@ -119,10 +119,34 @@ Harness: `bench_100.c`, `bench_100.py`, plus earlier isolated CRC/Adler/gzip ben
 
 Shipped patches: `ubuntu24/patches/` (zlib, gzip, coreutils, grep, tar, diffutils).
 
+## Memory / running applications (follow-up)
+
+Full write-up and harness: `MEMORY.md`. None of these beat Noble's defaults
+on this host, so no new patch.
+
+| # | Idea | Result | Decision |
+|---|---|---|---|
+| 101 | `madvise(MADV_HUGEPAGE)` on `malloc` ≥2 MiB (`sort` heap) | 0 AnonHugePages (needs 2 MiB alignment) | **DISCARD** |
+| 102 | `posix_memalign(2MiB)` + `MADV_HUGEPAGE` on `sort` buffer | fill up to 2×; line `qsort` 0.76–1.06×; overall no proven win | **DISCARD** |
+| 103 | `MADV_COLLAPSE` / `MADV_WILLNEED` on the same buffer | same noise band as #102 | **DISCARD** |
+| 104 | glibc `madvise` THP on every large `mmap` | equivalent to THP=`always` for those apps | **DISCARD** |
+| 105 | `GLIBC_TUNABLES=glibc.malloc.arena_max=1` global | **0.31×** alloc rate; hold RSS not better here | **DISCARD** |
+| 106 | `arena_max=2` global | **0.74×** alloc rate | **DISCARD** as default (opt-in per daemon) |
+| 107 | `tcache_count=0` | **0.26×** alloc rate | **DISCARD** |
+| 108 | `tcache_count=32` | **0.87×** vs default 7 | **DISCARD** |
+| 109 | `malloc_trim(0)` after 256 KiB frees | RSS unchanged (already `munmap`) | **DISCARD** |
+| 110 | `PYTHONMALLOC=malloc` distro default | faster 64 B microbench; worse long-run fragmentation | **DISCARD** |
+| 111 | Python `gc.disable()` / threshold 7000 default | faster batch alloc; leaks / workload-specific | **DISCARD** as default |
+| 112 | `jemalloc`/`tcmalloc` distro `LD_PRELOAD` | not installed; unsafe as a global preload | **DISCARD** |
+| 113 | `posix_fadvise(DONTNEED)` after `cp`/`cat` | steals cache from the next reader | **DISCARD** as default |
+
 ## How to reproduce
 
 ```sh
 cc -O3 -o ubuntu24/benchmarks/bench_100 ubuntu24/benchmarks/bench_100.c
 ubuntu24/benchmarks/bench_100
 python3 ubuntu24/benchmarks/bench_100.py
+make -C ubuntu24/benchmarks bench_memory
+ubuntu24/benchmarks/bench_memory arena
+python3 ubuntu24/benchmarks/bench_memory.py
 ```

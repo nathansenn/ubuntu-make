@@ -50,6 +50,9 @@ debian/*.1
 # Ubuntu 24.04 unpacked sources and orig tarballs (patches live in ubuntu24/patches)
 ubuntu24/src/
 ubuntu24/build/
+ubuntu24/benchmarks/bench_hotpaths
+ubuntu24/benchmarks/bench_100
+ubuntu24/benchmarks/bench_memory
 
 # Debian config
 debian/.debhelper
