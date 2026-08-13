@@ -342,3 +342,23 @@
  }
  
  
+--- gzip-1.12/bits.c	2022-01-03 18:16:30.000000000 +0000
++++ gzip-1.12/bits.c	2026-08-13 20:45:25.620299918 +0000
+@@ -210,7 +210,15 @@
+ #ifdef DEBUG
+     bits_sent += (off_t)len<<3;
+ #endif
+-    while (len--) {
+-        put_byte(*buf++);
++    while (len > 0) {
++        unsigned n = OUTBUFSIZ - outcnt;
++        if (n > len)
++            n = len;
++        memcpy (outbuf + outcnt, buf, n);
++        outcnt += n;
++        buf += n;
++        len -= n;
++        if (outcnt == OUTBUFSIZ)
++            flush_outbuf ();
+     }
+ }

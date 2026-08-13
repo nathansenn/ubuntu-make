@@ -32,7 +32,9 @@ Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks
 | Python `zlib.decompress` via new `libz` | **1.10×** (666 vs 606 MB/s) | KEEP |
 | coreutils `wc` `BUFFER_SIZE` 16 KiB → 256 KiB | **1.50×** read throughput vs 16 KiB | KEEP |
 | coreutils `IO_BUFSIZE` 128 KiB → 256 KiB | **1.02×** (matches upstream comment table) | KEEP |
-| coreutils `tr`/`head`/`tail` 8 KiB → 256 KiB | same I/O plateau as `wc` | KEEP |
+| coreutils `tr`/`head`/`tail`/`tee`/`tac` 8 KiB → 256 KiB | same I/O plateau as `wc` | KEEP |
+| coreutils `yes` write floor 8 KiB → 256 KiB | **1.30×** sequential write | KEEP |
+| gzip `copy_block` chunked `memcpy` | **1.09×** vs prior patched `gzip -1` on random | KEEP |
 | grep `INITIAL_BUFSIZE` 96 KiB → 256 KiB | fewer syscalls; I/O already plateaued | KEEP |
 | tar `DEFAULT_BLOCKING` 20 → 512 (10 KiB → 256 KiB) | **1.36×** `tar cf`, **1.23×** `tar xf` | KEEP |
 | diffutils `cmp`/`diff -q` buffer floor 256 KiB | memcmp-bound here (~1.01×); 64× fewer `read`s | KEEP |
@@ -46,6 +48,7 @@ gzip inflate numbers above are isolated against a build that already had PCLMUL 
 | Area | Finding |
 |---|---|
 | zlib AVX2 `compare256` / `longest_match` | **DISCARD** — 0.91× on mixed Python/stdlib corpus (short matches); 1.06× only on highly repetitive text |
+| zlib `inflate_fast` `memcpy` when `dist>=len` | **DISCARD** — leftover non-overlap copies; 0–3% expected after stored/dist=1 wins |
 | zlib `inflate_fast` AVX2/AVX-512 copy | **DISCARD** — max match 258 B; Chromium SSE2 chunkcopy is the only credible port, not a small patch |
 | xz/liblzma CRC | Already CPUID-dispatches CLMUL |
 | xz 5.4.5 vs 5.6 range-decoder asm | **DISCARD** here — large cherry-pick onto the post-backdoor 5.4.5 base |
@@ -63,6 +66,12 @@ gzip inflate numbers above are isolated against a build that already had PCLMUL 
 | coreutils `sort` / `cut` / `uniq` | sort merge buffer already 256 KiB; cut/uniq are `getc` |
 | make 4.3 / bash 5.2 | Already has Jenkins hash; not a CPU bottleneck |
 | glibc `memcpy`/`memchr` | Already AVX2/AVX-512 ifunc |
+| unzip / zip / cpio | Inflate/deflate bound; zip already has i386 CRC asm; cpio 512 B is format |
+| pcre2 / xxhash / brotli | JIT+SSE2, AVX2 dispatch, and encoder TZCNT already on |
+| file / gawk / e2fsprogs / patch | Wrong bottleneck (magic, parse, FS-block, line) |
+| python3.12 hashlib/json | OpenSSL SHA-NI already; json has no SIMD; zlib win is libz |
+| git | SHA1DC on purpose (`NO_OPENSSL=1`); pack I/O is mmap |
+| curl | 16 KiB is API contract; TLS/socket bound |
 
 ## Apply
 

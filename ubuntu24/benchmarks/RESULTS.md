@@ -60,6 +60,26 @@ Correctness: patched `gzip -dc` matched stock output on all three corpora (`cmp`
 
 Changes: stored-block bulk `memcpy` from `inbuf` (was `NEEDBITS(8)` per byte); overlapping LZ77 copy uses `memset` for dist=1 and a 3-byte unroll otherwise; fixed Huffman tables built once.
 
+## gzip 1.12 `copy_block` (`gzip -1` stored output)
+
+Isolated against the previous patched binary (PCLMUL CRC + inflate + `UNALIGNED_OK`).
+
+| Corpus | no-copyblock | with-copyblock | vs prior |
+|---|---|---|---|
+| incompressible (`gzip -1` random) | 50.1 MB/s | 54.7 MB/s | **1.09×** |
+| repetitive text (`gzip -1`) | 2631 MB/s | 2622 MB/s | 1.00× (deflate_fast, not stored) |
+
+Correctness: patched `-1`/`-6` round-tripped vs stock `cmp`.
+
+## coreutils `yes` write floor (256 MiB to a file)
+
+| Buffer | best | vs 8 KiB |
+|---|---|---|
+| 8 KiB (`BUFSIZ`) | 0.186 s | 1.00× |
+| 256 KiB | 0.143 s | **1.30×** |
+
+`tee`/`tac`/`head` remaining pipe/copy paths use the same 8→256 KiB `read()` plateau already measured above.
+
 ## tar 1.35 default blocking (stock `/usr/bin/tar -b`)
 
 64 MiB payload (`text32m` + `rand32m`). `-b 20` is the historical default (10 KiB records); `-b 512` is 256 KiB.
@@ -92,3 +112,10 @@ End-to-end is memcmp-bound at ~3.1 GB/s on this host. The patch still cuts `read
 - sed / findutils / mawk / jq / libxml2 / less / procps / sqlite3 256 KiB: wrong bottleneck.
 - rsync `IO_BUFFER_SIZE` 32→256 KiB: file map already 256 KiB; socket buffers are per-connection RAM.
 - xz 5.6 range-decoder asm onto Ubuntu's 5.4.5: large cherry-pick after the backdoor revert.
+- zlib `inffast` `memcpy` when `dist>=len`: leftover non-overlap copies after stored/dist=1 wins.
+- unzip/zip/cpio 256 KiB or PCLMUL CRC: inflate/deflate bound; zip already has i386 CRC asm.
+- pcre2/xxhash/brotli debian SIMD flags: already enabled on amd64.
+- file/gawk/e2fsprogs/patch/make: wrong bottleneck.
+- python3.12 SHA/json: OpenSSL SHA-NI already; no json SIMD.
+- git SHA-NI / 256 KiB: `NO_OPENSSL=1` + SHA1DC by policy; mmap packs.
+- curl 16→256 KiB: API contract; TLS/socket bound.

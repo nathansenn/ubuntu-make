@@ -1,4 +1,4 @@
---- coreutils-9.4/src/ioblksize.h	2023-08-29 11:39:27.000000000 +0000
+--- /tmp/u24clean2/coreutils-9.4/src/ioblksize.h	2023-08-29 11:39:27.000000000 +0000
 +++ coreutils-9.4/src/ioblksize.h	2026-08-12 23:03:33.786633114 +0000
 @@ -71,7 +71,7 @@
     In the future we could use the above method if available
@@ -9,7 +9,7 @@
  static inline idx_t
  io_blksize (struct stat sb)
  {
---- coreutils-9.4/src/wc.c	2023-08-29 11:39:27.000000000 +0000
+--- /tmp/u24clean2/coreutils-9.4/src/wc.c	2023-08-29 11:39:27.000000000 +0000
 +++ coreutils-9.4/src/wc.c	2026-08-12 23:03:33.794633181 +0000
 @@ -51,7 +51,7 @@
    proper_name ("David MacKenzie")
@@ -20,7 +20,7 @@
  
  #ifdef USE_AVX2_WC_LINECOUNT
  /* From wc_avx2.c */
---- coreutils-9.4/src/tr.c	2023-08-29 11:39:27.000000000 +0000
+--- /tmp/u24clean2/coreutils-9.4/src/tr.c	2023-08-29 11:39:27.000000000 +0000
 +++ coreutils-9.4/src/tr.c	2026-08-12 23:32:56.317244378 +0000
 @@ -239,7 +239,7 @@
     It is set in main and used there and in validate().  */
@@ -31,8 +31,17 @@
  
  static char const *const char_class_name[] =
  {
---- coreutils-9.4/src/head.c	2023-08-27 16:33:32.000000000 +0000
-+++ coreutils-9.4/src/head.c	2026-08-12 23:32:56.213244679 +0000
+--- /tmp/u24clean2/coreutils-9.4/src/head.c	2023-08-27 16:33:32.000000000 +0000
++++ coreutils-9.4/src/head.c	2026-08-13 20:50:31.227451930 +0000
+@@ -193,7 +193,7 @@
+ static enum Copy_fd_status
+ copy_fd (int src_fd, uintmax_t n_bytes)
+ {
+-  char buf[BUFSIZ];
++  static char buf[256 * 1024];
+   const size_t buf_size = sizeof (buf);
+ 
+   /* Copy the file contents.  */
 @@ -253,7 +253,7 @@
    bool ok = true;
  
@@ -42,7 +51,45 @@
  #endif
  #define READ_BUFSIZE HEAD_TAIL_PIPE_READ_BUFSIZE
  
---- coreutils-9.4/src/tail.c	2026-08-13 20:07:29.000000000 +0000
+@@ -500,7 +500,7 @@
+ {
+   struct linebuffer
+   {
+-    char buffer[BUFSIZ + 1];
++    char buffer[HEAD_TAIL_PIPE_READ_BUFSIZE + 1];
+     size_t nbytes;
+     size_t nlines;
+     struct linebuffer *next;
+@@ -522,7 +522,7 @@
+      n_elide newlines, or until EOF, whichever comes first.  */
+   while (true)
+     {
+-      n_read = safe_read (fd, tmp->buffer, BUFSIZ);
++      n_read = safe_read (fd, tmp->buffer, HEAD_TAIL_PIPE_READ_BUFSIZE);
+       if (n_read == 0 || n_read == SAFE_READ_ERROR)
+         break;
+ 
+@@ -553,7 +553,7 @@
+       /* If there is enough room in the last buffer read, just append the new
+          one to it.  This is because when reading from a pipe, 'n_read' can
+          often be very small.  */
+-      if (tmp->nbytes + last->nbytes < BUFSIZ)
++      if (tmp->nbytes + last->nbytes < HEAD_TAIL_PIPE_READ_BUFSIZE)
+         {
+           memcpy (&last->buffer[last->nbytes], tmp->buffer, tmp->nbytes);
+           last->nbytes += tmp->nbytes;
+@@ -774,8 +774,8 @@
+ static bool
+ head_bytes (char const *filename, int fd, uintmax_t bytes_to_write)
+ {
+-  char buffer[BUFSIZ];
+-  size_t bytes_to_read = BUFSIZ;
++  static char buffer[256 * 1024];
++  size_t bytes_to_read = sizeof buffer;
+ 
+   while (bytes_to_write)
+     {
+--- /tmp/u24clean2/coreutils-9.4/src/tail.c	2026-08-13 20:49:33.000000000 +0000
 +++ coreutils-9.4/src/tail.c	2026-08-13 19:56:33.205905003 +0000
 @@ -77,6 +77,11 @@
  /* Number of items to tail.  */
@@ -110,3 +157,46 @@
          {
            memcpy (&last->buffer[last->nbytes], tmp->buffer, tmp->nbytes);
            last->nbytes += tmp->nbytes;
+--- /tmp/u24clean2/coreutils-9.4/src/tee.c	2023-07-05 11:09:55.000000000 +0000
++++ coreutils-9.4/src/tee.c	2026-08-13 20:45:25.364300586 +0000
+@@ -227,7 +227,7 @@
+   size_t n_outputs = 0;
+   FILE **descriptors;
+   bool *out_pollable IF_LINT ( = nullptr);
+-  char buffer[BUFSIZ];
++  static char buffer[256 * 1024];
+   ssize_t bytes_read = 0;
+   int i;
+   int first_out = 0;  /* idx of first non-null output in descriptors */
+--- /tmp/u24clean2/coreutils-9.4/src/yes.c	2023-07-05 11:09:55.000000000 +0000
++++ coreutils-9.4/src/yes.c	2026-08-13 20:45:25.464300326 +0000
+@@ -89,10 +89,11 @@
+     }
+   while (++operandp < operand_lim);
+ 
+-  /* Improve performance by using a buffer size greater than BUFSIZ / 2.  */
+-  if (bufalloc <= BUFSIZ / 2)
++  /* Improve performance by using a buffer size greater than half of
++     the sequential write plateau (256 KiB).  */
++  if (bufalloc <= (256 * 1024) / 2)
+     {
+-      bufalloc = BUFSIZ;
++      bufalloc = 256 * 1024;
+       reuse_operand_strings = false;
+     }
+ 
+--- /tmp/u24clean2/coreutils-9.4/src/tac.c	2023-07-31 17:55:44.000000000 +0000
++++ coreutils-9.4/src/tac.c	2026-08-13 20:45:25.624299908 +0000
+@@ -58,10 +58,10 @@
+ 
+ 
+ /* The number of bytes per atomic read. */
+-#define INITIAL_READSIZE 8192
++#define INITIAL_READSIZE (256 * 1024)
+ 
+ /* The number of bytes per atomic write. */
+-#define WRITESIZE 8192
++#define WRITESIZE (256 * 1024)
+ 
+ /* The string that separates the records of the file. */
+ static char const *separator;
