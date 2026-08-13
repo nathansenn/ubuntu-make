@@ -1,5 +1,7 @@
 # Ubuntu 24.04 hot-path benches
 
+One hundred candidates (KEEP / ALREADY / DISCARD): `WAYS.md`.
+
 Host: Intel Xeon, Ubuntu 24.04.4 LTS, gcc as shipped. 32 MiB buffers unless noted.
 
 ## zlib 1.3 (vs `/lib/x86_64-linux-gnu/libz.so.1`)

@@ -19,7 +19,7 @@ Ubuntu's zlib 1.3 already has SIMD CRC on **POWER** and **s390x**, but `libz.so.
 
 ## Proven results (KEEP)
 
-Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks/RESULTS.md`.
+Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks/RESULTS.md`. One hundred candidates with KEEP/DISCARD: `benchmarks/WAYS.md`.
 
 | Change | vs Ubuntu stock | Decision |
 |---|---|---|
@@ -104,6 +104,6 @@ cd ubuntu24/src/zlib-1.3.dfsg
 ## Layout
 
 - `patches/` — diffs against Ubuntu-patched upstream
-- `benchmarks/` — isolated CRC / `read()` harness
+- `benchmarks/` — isolated CRC / `read()` harness, `WAYS.md` (100 ideas), `bench_100.c` / `bench_100.py`
 - `scripts/fetch-sources.sh` — `apt-get source` helper
 - `src/` — local unpacked trees (gitignored; not committed)
