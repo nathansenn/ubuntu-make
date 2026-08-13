@@ -218,7 +218,7 @@ local 32 MiB sweep (`/tmp/u24wave`). **No new KEEP.** `seq` looked like
 | 181 | Python `pickle` 1M tuples | opcode VM | **DISCARD** |
 | 182 | Python `re.findall` 16 MiB | `_sre` | **DISCARD** |
 | 183 | Python `bytes.translate` / `encode` | already C | **ALREADY** |
-| 184 | Python `io` default 8 KiB | app sets `buffering=` | **DISCARD** as default |
+| 184 | Python `io` default 8→256 KiB | `open().read()` 32 MiB 0.035→0.026 s (**1.37×**); 32× RSS per fd | **DISCARD** as default |
 | 185 | splice/tee 32 MiB vs `read` 256 KiB | extra copy for most CLIs | **DISCARD** |
 | 186 | `pread` vs `read` 32 MiB | same cached bandwidth | **DISCARD** |
 | 187 | `O_DIRECT` 256 KiB | slower than page cache here | **DISCARD** |

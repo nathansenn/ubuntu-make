@@ -151,3 +151,8 @@ write-only case that actually kept 256 KiB.
 `od -tx1` is ~8 MB/s (`xprintf` per field). `iconv` UTF-8→UTF-8 is 0.11 s vs
 `cat` 0.02 s (validation, not a small patch). gzip in/out buffers are already
 256 KiB. Line tools (`cut`/`nl`/`paste`/…) stay parse-bound vs `wc -l` 0.015 s.
+
+Python `open(..., buffering=256*1024)` reads 32 MiB in 0.026 s vs 0.035 s at
+the 8 KiB default (**1.37×**) but would charge every file object 256 KiB.
+Leave `io.DEFAULT_BUFFER_SIZE` at 8192; apps that drain large files can set
+`buffering=` themselves.
