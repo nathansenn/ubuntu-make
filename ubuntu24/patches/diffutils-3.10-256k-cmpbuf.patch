@@ -1,0 +1,45 @@
+--- diffutils-3.10/lib/cmpbuf.h	2023-01-02 01:18:33.000000000 +0000
++++ diffutils-3.10/lib/cmpbuf.h	2026-08-13 19:56:20.477942967 +0000
+@@ -15,5 +15,9 @@
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+ 
++/* Floor for bytewise comparison buffers (cmp, diff -q).
++   256 KiB matches the sequential read() plateau on modern Linux.  */
++enum { CMP_IO_BUFSIZE = 256 * 1024 };
++
+ size_t block_read (int, char *, size_t);
+ size_t buffer_lcm (size_t, size_t, size_t) _GL_ATTRIBUTE_CONST;
+--- diffutils-3.10/lib/cmpbuf.c	2023-01-02 01:18:33.000000000 +0000
++++ diffutils-3.10/lib/cmpbuf.c	2026-08-13 19:56:20.441943064 +0000
+@@ -94,7 +94,7 @@
+ 
+   /* Yield reasonable values if buffer sizes are zero.  */
+   if (!a)
+-    return b ? b : 8 * 1024;
++    return b ? b : CMP_IO_BUFSIZE;
+   if (!b)
+     return a;
+ 
+@@ -104,5 +104,9 @@
+ 
+   /* Yield a if there is an overflow.  */
+   q = a / n;
+-  return !INT_MULTIPLY_WRAPV (q, b, &lcm) && lcm <= lcm_max ? lcm : a;
++  if (!INT_MULTIPLY_WRAPV (q, b, &lcm) && lcm <= lcm_max)
++    a = lcm;
++  if (a < CMP_IO_BUFSIZE && CMP_IO_BUFSIZE <= lcm_max)
++    a = CMP_IO_BUFSIZE;
++  return a;
+ }
+--- diffutils-3.10/src/cmp.c	2023-05-20 09:17:26.000000000 +0000
++++ diffutils-3.10/src/cmp.c	2026-08-13 19:56:20.453943032 +0000
+@@ -314,7 +314,7 @@
+         {
+           stat_buf[f].st_size = -1;
+ #if HAVE_STRUCT_STAT_ST_BLKSIZE
+-          stat_buf[f].st_blksize = 8 * 1024;
++          stat_buf[f].st_blksize = CMP_IO_BUFSIZE;
+ #endif
+         }
+     }

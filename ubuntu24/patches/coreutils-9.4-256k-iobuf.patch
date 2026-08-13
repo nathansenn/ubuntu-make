@@ -42,3 +42,71 @@
  #endif
  #define READ_BUFSIZE HEAD_TAIL_PIPE_READ_BUFSIZE
  
+--- coreutils-9.4/src/tail.c	2026-08-13 20:07:29.000000000 +0000
++++ coreutils-9.4/src/tail.c	2026-08-13 19:56:33.205905003 +0000
+@@ -77,6 +77,11 @@
+ /* Number of items to tail.  */
+ #define DEFAULT_N_LINES 10
+ 
++/* Heap-backed pipe reads.  Stack loops stay on BUFSIZ.  */
++#ifndef HEAD_TAIL_PIPE_READ_BUFSIZE
++# define HEAD_TAIL_PIPE_READ_BUFSIZE (256 * 1024)
++#endif
++
+ /* Special values for dump_remainder's N_BYTES parameter.  */
+ #define COPY_TO_EOF UINTMAX_MAX
+ #define COPY_A_BUFFER (UINTMAX_MAX - 1)
+@@ -629,7 +634,7 @@
+ {
+   struct linebuffer
+   {
+-    char buffer[BUFSIZ];
++    char buffer[HEAD_TAIL_PIPE_READ_BUFSIZE];
+     size_t nbytes;
+     size_t nlines;
+     struct linebuffer *next;
+@@ -648,7 +653,7 @@
+   /* Input is always read into a fresh buffer.  */
+   while (true)
+     {
+-      n_read = safe_read (fd, tmp->buffer, BUFSIZ);
++      n_read = safe_read (fd, tmp->buffer, HEAD_TAIL_PIPE_READ_BUFSIZE);
+       if (n_read == 0 || n_read == SAFE_READ_ERROR)
+         break;
+       tmp->nbytes = n_read;
+@@ -671,7 +676,7 @@
+       /* If there is enough room in the last buffer read, just append the new
+          one to it.  This is because when reading from a pipe, 'n_read' can
+          often be very small.  */
+-      if (tmp->nbytes + last->nbytes < BUFSIZ)
++      if (tmp->nbytes + last->nbytes < HEAD_TAIL_PIPE_READ_BUFSIZE)
+         {
+           memcpy (&last->buffer[last->nbytes], tmp->buffer, tmp->nbytes);
+           last->nbytes += tmp->nbytes;
+@@ -767,7 +772,7 @@
+ {
+   struct charbuffer
+   {
+-    char buffer[BUFSIZ];
++    char buffer[HEAD_TAIL_PIPE_READ_BUFSIZE];
+     size_t nbytes;
+     struct charbuffer *next;
+   };
+@@ -786,7 +791,7 @@
+   /* Input is always read into a fresh buffer.  */
+   while (true)
+     {
+-      n_read = safe_read (fd, tmp->buffer, BUFSIZ);
++      n_read = safe_read (fd, tmp->buffer, HEAD_TAIL_PIPE_READ_BUFSIZE);
+       if (n_read == 0 || n_read == SAFE_READ_ERROR)
+         break;
+       *read_pos += n_read;
+@@ -797,7 +802,7 @@
+       /* If there is enough room in the last buffer read, just append the new
+          one to it.  This is because when reading from a pipe, 'nbytes' can
+          often be very small.  */
+-      if (tmp->nbytes + last->nbytes < BUFSIZ)
++      if (tmp->nbytes + last->nbytes < HEAD_TAIL_PIPE_READ_BUFSIZE)
+         {
+           memcpy (&last->buffer[last->nbytes], tmp->buffer, tmp->nbytes);
+           last->nbytes += tmp->nbytes;

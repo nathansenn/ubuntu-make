@@ -1,0 +1,14 @@
+--- tar-1.35+dfsg/src/tar.c	2026-08-13 20:07:30.000000000 +0000
++++ tar-1.35+dfsg/src/tar.c	2026-08-13 19:56:20.513942871 +0000
+@@ -65,7 +65,10 @@
+ #endif
+ 
+ #ifndef DEFAULT_BLOCKING
+-# define DEFAULT_BLOCKING 20
++/* 512 × 512-byte blocks = 256 KiB.  The historical default of 20 (10 KiB)
++   matches 9-track tape; sequential disk create/extract is syscall-bound
++   at that size.  Override with -b / --record-size.  */
++# define DEFAULT_BLOCKING 512
+ #endif
+ 
+ /* Print a message if not all links are dumped */

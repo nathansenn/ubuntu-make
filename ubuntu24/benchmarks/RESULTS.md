@@ -40,16 +40,55 @@ Match OK (`val=aeeefab0` on the 32 MiB pattern).
 | 256 KiB (new) | 18.25 | **1.50×** |
 | 512 KiB | 17.99 | 1.48× |
 
-256 KiB is the plateau on this machine; 16 KiB is the clear loss. `tr` used `BUFSIZ` (8 KiB); `head` pipe path used `BUFSIZ`. Both now 256 KiB.
+256 KiB is the plateau on this machine; 16 KiB is the clear loss. `tr` used `BUFSIZ` (8 KiB); `head`/`tail` pipe paths used `BUFSIZ`. Those now 256 KiB.
 
 ## gzip `UNALIGNED_OK`
 
 Ubuntu `debian/rules` had `ifeq ($(buildarch), amd64)` but never sets `buildarch`, so `-DUNALIGNED_OK` was not applied. `tailor.h` now defines it on `__x86_64__`, and `debian/rules` tests `DEB_HOST_ARCH`.
 
+## gzip 1.12 inflate (32 MiB payloads, `gzip -dc`)
+
+Isolated against a build that already had PCLMUL `updcrc` (`crc-only`) so the inflate patch is not credited with the CRC win.
+
+| Corpus | stock | crc-only | full (crc+inflate) | full vs crc-only |
+|---|---|---|---|---|
+| repetitive text (`gzip -6`) | 417 MB/s | 1957 MB/s | 3298 MB/s | **1.68×** |
+| incompressible (`gzip -1` random) | 254 MB/s | 538 MB/s | 6816 MB/s | **12.6×** |
+| zeros (`gzip -1`) | 461 MB/s | 10820 MB/s | 10890 MB/s | 1.01× (already output-bound) |
+
+Correctness: patched `gzip -dc` matched stock output on all three corpora (`cmp` OK).
+
+Changes: stored-block bulk `memcpy` from `inbuf` (was `NEEDBITS(8)` per byte); overlapping LZ77 copy uses `memset` for dist=1 and a 3-byte unroll otherwise; fixed Huffman tables built once.
+
+## tar 1.35 default blocking (stock `/usr/bin/tar -b`)
+
+64 MiB payload (`text32m` + `rand32m`). `-b 20` is the historical default (10 KiB records); `-b 512` is 256 KiB.
+
+| Command | `-b 20` | `-b 512` | vs 20 |
+|---|---|---|---|
+| `tar cf` | 0.0646 s | 0.0476 s | **1.36×** |
+| `tar xf` | 0.0270 s | 0.0220 s | **1.23×** |
+
+## diffutils 3.10 `cmp -s` (256 MiB identical files)
+
+| Binary | best | vs stock |
+|---|---|---|
+| `/usr/bin/cmp` (4 KiB `st_blksize`) | 0.0827 s | 1.00× |
+| patched (256 KiB floor) | 0.0817 s | 1.01× |
+
+End-to-end is memcmp-bound at ~3.1 GB/s on this host. The patch still cuts `read` syscalls ~64× and matches the 256 KiB policy used by coreutils/grep.
+
 ## DISCARD
 
 - Replacing zlib's braided CRC with PCLMUL **without** a working ifunc: no win (stays at 6 GB/s).
 - zlib/gzip AVX2 or 8-byte `compare256` in `longest_match`: **0.91×** deflate-6 on a 24 MiB Python stdlib corpus (short matches dominate). Only helped highly repetitive dictionary text (~1.06×).
+- zlib `inflate_fast` AVX2/AVX-512 widened copies: max match 258 B; overlap (`dist=1`) dominates; not a small patch.
 - Expecting gzip `-1` / deflate-6 to jump from checksum SIMD: LZ77/Huffman bound.
 - xz CRC CLMUL, zstd BMI2, OpenSSL SHA-NI, coreutils `cksum` PCLMUL, glibc `memcpy`: already in Noble.
 - Kernel / OpenSSL SHA / AVX2 `wc -l`: already in Noble.
+- bzip2 output-path PCLMUL CRC: ~0–9% of decompress except pathological RLE.
+- libpng `--enable-intel-sse`: `timepng` ~1.00× (inflate-bound).
+- pigz-local CRC/SIMD: pigz already calls `libz` `crc32`/`deflate`.
+- sed / findutils / mawk / jq / libxml2 / less / procps / sqlite3 256 KiB: wrong bottleneck.
+- rsync `IO_BUFFER_SIZE` 32→256 KiB: file map already 256 KiB; socket buffers are per-connection RAM.
+- xz 5.6 range-decoder asm onto Ubuntu's 5.4.5: large cherry-pick after the backdoor revert.

@@ -18,7 +18,7 @@ fi
 
 $SUDO apt-get update -qq
 cd "$SRC"
-apt-get source zlib gzip coreutils grep
+apt-get source zlib gzip coreutils grep tar diffutils
 
 echo "Unpacked under $SRC"
 ls -d "$SRC"/*/
