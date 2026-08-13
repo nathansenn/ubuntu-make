@@ -4,3 +4,4 @@ coreutils-9.4-256k-iobuf.patch
 grep-3.11-256k-buf.patch
 tar-1.35-256k-blocking.patch
 diffutils-3.10-256k-cmpbuf.patch
+git-2.43-256k-copyfd.patch

@@ -10,6 +10,7 @@ Patches against the **Ubuntu 24.04 LTS (Noble)** packages fetched with `apt-get 
 | grep | 3.11-4build1 |
 | tar | 1.35+dfsg-3ubuntu0.4 |
 | diffutils | 3.10-1build1 |
+| git | 2.43.0-1ubuntu7.3 |
 
 This is not a kernel tree. Noble already ships AVX2 `wc -l`, OpenSSL SHA-NI `sha256sum`, PCLMUL `cksum`, and `copy_file_range` in `cat`/`cp`. Those are left alone.
 
@@ -19,7 +20,7 @@ Ubuntu's zlib 1.3 already has SIMD CRC on **POWER** and **s390x**, but `libz.so.
 
 ## Proven results (KEEP)
 
-Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks/RESULTS.md`. Candidates with KEEP/DISCARD: `benchmarks/WAYS.md` (213 ideas; 23 KEEP). Running-app allocators, THP, and Python GC: `benchmarks/MEMORY.md`.
+Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks/RESULTS.md`. Candidates with KEEP/DISCARD: `benchmarks/WAYS.md` (213 ideas; 24 KEEP). Running-app allocators, THP, and Python GC: `benchmarks/MEMORY.md`.
 
 | Change | vs Ubuntu stock | Decision |
 |---|---|---|
@@ -38,6 +39,7 @@ Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks
 | grep `INITIAL_BUFSIZE` 96 KiB → 256 KiB | fewer syscalls; I/O already plateaued | KEEP |
 | tar `DEFAULT_BLOCKING` 20 → 512 (10 KiB → 256 KiB) | **1.36×** `tar cf`, **1.23×** `tar xf` | KEEP |
 | diffutils `cmp`/`diff -q` buffer floor 256 KiB | memcmp-bound here (~1.01×); 64× fewer `read`s | KEEP |
+| git `copy_fd` 8 KiB → 256 KiB | **1.39×** median 32 MiB file copy (`/tmp`); `/dev/shm` **1.28×** | KEEP |
 
 `__builtin_cpu_supports()` returns 0 inside GNU ifunc resolvers (libgcc CPU init has not run yet). Resolvers use **CPUID leaf 1** instead. Direct calls to the SIMD kernels were ~4×/6×; ifunc with the builtin stayed at scalar speed until that fix.
 
@@ -70,7 +72,7 @@ gzip inflate numbers above are isolated against a build that already had PCLMUL 
 | pcre2 / xxhash / brotli | JIT+SSE2, AVX2 dispatch, and encoder TZCNT already on |
 | file / gawk / e2fsprogs / patch | Wrong bottleneck (magic, parse, FS-block, line) |
 | python3.12 hashlib/json | OpenSSL SHA-NI already; json has no SIMD; zlib win is libz |
-| git | SHA1DC on purpose (`NO_OPENSSL=1`); pack I/O is mmap |
+| git | SHA1DC on purpose (`NO_OPENSSL=1`); pack I/O is mmap; `copy_fd` now 256 KiB |
 | curl | 16 KiB is API contract; TLS/socket bound |
 
 ## Apply
@@ -84,6 +86,7 @@ patch -p1 -d coreutils-9.4   < ubuntu24/patches/coreutils-9.4-256k-iobuf.patch
 patch -p1 -d grep-3.11       < ubuntu24/patches/grep-3.11-256k-buf.patch
 patch -p1 -d tar-1.35+dfsg   < ubuntu24/patches/tar-1.35-256k-blocking.patch
 patch -p1 -d diffutils-3.10  < ubuntu24/patches/diffutils-3.10-256k-cmpbuf.patch
+patch -p1 -d git-2.43.0      < ubuntu24/patches/git-2.43-256k-copyfd.patch
 ```
 
 Or drop the patches into each package's `debian/patches/` and add them to `series`.

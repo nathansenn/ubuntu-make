@@ -113,11 +113,11 @@ Harness: `bench_100.c`, `bench_100.py`, plus earlier isolated CRC/Adler/gzip ben
 
 | Decision | Count |
 |---|---|
-| **KEEP** (we patched, or policy already applied) | 23 |
+| **KEEP** (we patched, or policy already applied) | 24 |
 | **ALREADY** (Noble already has the fast path) | 38 |
 | **DISCARD** (no proven win, unsafe, or wrong bottleneck) | 152 |
 
-Shipped patches: `ubuntu24/patches/` (zlib, gzip, coreutils, grep, tar, diffutils).
+Shipped patches: `ubuntu24/patches/` (zlib, gzip, coreutils, grep, tar, diffutils, git).
 
 ## Memory / running applications (follow-up)
 
@@ -248,6 +248,7 @@ local 32 MiB sweep (`/tmp/u24wave`). **No new KEEP.** `seq` looked like
 | 211 | `crc32` standalone | `cksum` already PCLMUL | **ALREADY** |
 | 212 | Python `os.walk` `/usr/lib/python3.12` | stat-bound | **DISCARD** |
 | 213 | glibc `memcpy` again | AVX2/AVX-512 ifunc | **ALREADY** |
+| 214 | git `copy_fd` 8→256 KiB | 32 MiB file copy median **1.39×** (`/tmp`); `/dev/shm` **1.28×** | **KEEP** |
 
 Wave 2 score added to the running totals below. Still **no new source patch**.
 

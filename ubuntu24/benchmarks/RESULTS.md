@@ -156,3 +156,18 @@ Python `open(..., buffering=256*1024)` reads 32 MiB in 0.026 s vs 0.035 s at
 the 8 KiB default (**1.37×**) but would charge every file object 256 KiB.
 Leave `io.DEFAULT_BUFFER_SIZE` at 8192; apps that drain large files can set
 `buffering=` themselves.
+
+## git 2.43 `copy_fd` (KEEP)
+
+Same 8→256 KiB `read`/`write` floor as `yes`. Isolated 32 MiB copy (warmed,
+9 runs) of `/dev/shm/copyfd32m`:
+
+| Dest | 8 KiB median | 256 KiB median | vs 8 KiB |
+|---|---|---|---|
+| `/tmp` file | 0.0305 s | 0.0220 s | **1.39×** |
+| `/dev/shm` file | 0.0160 s | 0.0125 s | **1.28×** |
+| `/dev/null` | 0.0022 s | 0.0017 s | **1.29×** |
+
+Used by `copy_file` (clone templates, worktree, sequencer) and `convert.c`
+filter stdin. Pack I/O stays mmap; SHA1DC unchanged. `FILTER_BUFFER` and
+bulk-checkin 16→256 KiB were **0.85–0.98×** (DISCARD).
