@@ -138,3 +138,16 @@ See `MEMORY.md`. Headline measurements on this 4-CPU Xeon:
 
 THP needs 2 MiB alignment to form huge pages. It helps sequential fill and
 does not help GNU `sort`'s compare phase. No memory patch shipped.
+
+## Wave 2 leftover sweep (no new KEEP)
+
+32 MiB cached text/random on this host. Full table: `WAYS.md` #114–#213.
+
+The only candidate that looked like a win was `seq` 8→256 KiB (`stdbuf -o256K`
+on `seq 1 20000000`): a cold run was ~2×, but 8 warmed runs were **median
+0.99×** (0.467 vs 0.473 s). `seq` is increment+format bound; `yes` was the
+write-only case that actually kept 256 KiB.
+
+`od -tx1` is ~8 MB/s (`xprintf` per field). `iconv` UTF-8→UTF-8 is 0.11 s vs
+`cat` 0.02 s (validation, not a small patch). gzip in/out buffers are already
+256 KiB. Line tools (`cut`/`nl`/`paste`/…) stay parse-bound vs `wc -l` 0.015 s.

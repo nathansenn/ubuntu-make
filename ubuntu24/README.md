@@ -19,7 +19,7 @@ Ubuntu's zlib 1.3 already has SIMD CRC on **POWER** and **s390x**, but `libz.so.
 
 ## Proven results (KEEP)
 
-Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks/RESULTS.md`. One hundred candidates with KEEP/DISCARD: `benchmarks/WAYS.md`. Running-app allocators, THP, and Python GC: `benchmarks/MEMORY.md`.
+Measured on this Xeon (SHA-NI, AVX2, AVX-512, PCLMUL). Full numbers: `benchmarks/RESULTS.md`. Candidates with KEEP/DISCARD: `benchmarks/WAYS.md` (213 ideas; 23 KEEP). Running-app allocators, THP, and Python GC: `benchmarks/MEMORY.md`.
 
 | Change | vs Ubuntu stock | Decision |
 |---|---|---|

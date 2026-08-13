@@ -114,8 +114,8 @@ Harness: `bench_100.c`, `bench_100.py`, plus earlier isolated CRC/Adler/gzip ben
 | Decision | Count |
 |---|---|
 | **KEEP** (we patched, or policy already applied) | 23 |
-| **ALREADY** (Noble already has the fast path) | 16 |
-| **DISCARD** (no proven win, unsafe, or wrong bottleneck) | 61 |
+| **ALREADY** (Noble already has the fast path) | 38 |
+| **DISCARD** (no proven win, unsafe, or wrong bottleneck) | 152 |
 
 Shipped patches: `ubuntu24/patches/` (zlib, gzip, coreutils, grep, tar, diffutils).
 
@@ -139,6 +139,117 @@ on this host, so no new patch.
 | 111 | Python `gc.disable()` / threshold 7000 default | faster batch alloc; leaks / workload-specific | **DISCARD** as default |
 | 112 | `jemalloc`/`tcmalloc` distro `LD_PRELOAD` | not installed; unsafe as a global preload | **DISCARD** |
 | 113 | `posix_fadvise(DONTNEED)` after `cp`/`cat` | steals cache from the next reader | **DISCARD** as default |
+
+## Wave 2 — 100 more leftover ideas (this session)
+
+Same host and rules. Parallel survey of remaining CLI/libraries plus a
+local 32 MiB sweep (`/tmp/u24wave`). **No new KEEP.** `seq` looked like
+2× on a cold run and **0.99× median** once warmed.
+
+| # | Idea | Result | Decision |
+|---|---|---|---|
+| 114 | `seq` write floor 8→256 KiB (`stdbuf -o256K` proxy) | 20M ints: min 1.20×, **median 0.99×** (0.467 vs 0.473 s) | **DISCARD** |
+| 115 | `seq` float path `setvbuf` 256 KiB | 0.290 vs 0.278 s | **DISCARD** |
+| 116 | `od -An -tx1` SIMD hex / 256 KiB | 4 MiB in 0.50 s (~8 MB/s); `xprintf` per field | **DISCARD** |
+| 117 | `od` skip-by-`fread` `BUFSIZ` | skip path only; format-bound | **DISCARD** |
+| 118 | `ls` `smallbuf[BUFSIZ]` | pathname quoting, not sequential I/O | **DISCARD** |
+| 119 | gzip `INBUFSIZ`/`OUTBUFSIZ` 256 KiB | already `0x40000` unless `SMALL_MEM` | **ALREADY** |
+| 120 | `iconv` UTF-8→UTF-8 SIMD validate | 0.111 s vs `cat` 0.020 s; glibc gconv rewrite | **DISCARD** |
+| 121 | `iconv` UTF-8→LATIN1 / UTF-16LE | 0.156 / 0.109 s (32 MiB); conversion-bound | **DISCARD** |
+| 122 | `cut -d' ' -f2` 32 MiB | 0.166 s vs `wc -l` 0.015 s; `getc`/parse | **DISCARD** |
+| 123 | `uniq` 32 MiB | 0.132 s; line compare | **DISCARD** |
+| 124 | `nl` 32 MiB | 0.204 s; format | **DISCARD** |
+| 125 | `fold -w 80` 32 MiB | 0.144 s; column scan | **DISCARD** |
+| 126 | `expand` 32 MiB | 0.252 s; tab expand | **DISCARD** |
+| 127 | `paste` two 32 MiB files | 0.290 s; line merge | **DISCARD** |
+| 128 | `numfmt --to=iec` 1e6 lines | 0.542 s; parse/printf | **DISCARD** |
+| 129 | `csplit` 32 MiB | 0.108 s; not a 256 KiB plateau | **DISCARD** |
+| 130 | `split -b 1M` 32 MiB | 0.060 s; already `io_blksize` | **ALREADY** |
+| 131 | `factor` tiny list | 0.009 s | **DISCARD** |
+| 132 | `zstd -1` 32 MiB text | 0.099 s; BMI2+ASM | **ALREADY** |
+| 133 | `zstd -3` 32 MiB text | 0.138 s | **ALREADY** |
+| 134 | `lz4 -1` 32 MiB text | 0.100 s | **ALREADY** |
+| 135 | `xz -1` 8 MiB | 0.275 s; codec | **DISCARD** |
+| 136 | `bzip2 -1` 8 MiB | 0.645 s; codec | **DISCARD** |
+| 137 | `sed s/word/xxxx/g` 32 MiB | 0.286 s; regex | **DISCARD** |
+| 138 | `gawk '{s+=$1}'` 32 MiB | 0.229 s | **DISCARD** |
+| 139 | `mawk` same | 0.191 s; already 256 KiB I/O | **ALREADY** |
+| 140 | `jq` 200k-object array | 0.389 s; parse | **DISCARD** |
+| 141 | `file /usr/bin/*` | 0.446 s; magic per file | **DISCARD** |
+| 142 | `find /usr/bin -name '*.so'` | 0.001 s; tiny tree | **DISCARD** |
+| 143 | `ps aux` | 0.011 s | **DISCARD** |
+| 144 | `base64` 32 MiB | 0.079 s; table encode | **DISCARD** (rewrite) |
+| 145 | `basenc --base64` 32 MiB | 0.072 s | **DISCARD** |
+| 146 | `sha256sum` 32 MiB | 0.036 s; OpenSSL SHA-NI | **ALREADY** |
+| 147 | `sha512sum` 32 MiB | 0.103 s | **ALREADY** |
+| 148 | `b2sum` 32 MiB | 0.097 s | **ALREADY** |
+| 149 | `cksum` 32 MiB | 0.013 s; PCLMUL | **ALREADY** |
+| 150 | `md5sum` 32 MiB | 0.092 s | **ALREADY** |
+| 151 | `stdbuf -o256K` as a distro default | breaks interactive; no median win on `seq` | **DISCARD** |
+| 152 | `shred` 64→256 KiB `NONPERIODIC_OUTPUT_SIZE` | overwrite is write+fsync bound | **DISCARD** |
+| 153 | `pr` / `ptx` 256 KiB | paginate/index, not drain | **DISCARD** |
+| 154 | `join` / `comm` 256 KiB | line merge / `getc` | **DISCARD** |
+| 155 | `fmt` / `unexpand` 256 KiB | format / tab | **DISCARD** |
+| 156 | bash `for i in {1..100000}` | fork-free increment; not I/O | **DISCARD** |
+| 157 | bash input.c `BUFSIZ` | interactive / script parse | **DISCARD** |
+| 158 | `xargs` batching | already batches; exec-bound | **DISCARD** |
+| 159 | git `hash-object` 32 MiB | SHA1DC on purpose | **DISCARD** |
+| 160 | git `diff` / `log` I/O | mmap packs | **DISCARD** |
+| 161 | curl `file://` buffer ≠ 16 KiB | `CURL_MAX_WRITE_SIZE` contract | **DISCARD** |
+| 162 | rsync local `--dry-run` 64 MiB | map already 256 KiB | **DISCARD** |
+| 163 | wget `dlbufsize` again | network + `fflush` | **DISCARD** |
+| 164 | cpio default `-C 512` → 256 KiB | POSIX archive block | **DISCARD** |
+| 165 | zip/unzip I/O 256 KiB | inflate/deflate bound | **DISCARD** |
+| 166 | less `LBUFSIZE` again | pager LRU | **DISCARD** |
+| 167 | `hexdump -C` 8 MiB | format/printf | **DISCARD** |
+| 168 | `rev` / `column` 16 MiB | wchar/getline | **DISCARD** |
+| 169 | `make -n` ubuntu-make | parse/stat | **DISCARD** |
+| 170 | patch `bufsize` again | `getc` + plan-A | **DISCARD** |
+| 171 | e2fsprogs 4K `pread` | FS-block | **DISCARD** |
+| 172 | grep DFA/kwset leftover | `-F`/`-E` 0.7 ms on 32 MiB (rare word) | **DISCARD** |
+| 173 | `grep -P` vs `-E` default | `-P` is opt-in PCRE2 | **DISCARD** |
+| 174 | xxhsum 32 MiB | AVX2 dispatch | **ALREADY** |
+| 175 | sqlite `cache_size` default | embedder ABI | **DISCARD** |
+| 176 | jq `--unbuffered` default | worse throughput | **DISCARD** |
+| 177 | libxml2 `INPUT_CHUNK` again | 250 B lookahead | **DISCARD** |
+| 178 | libpng debian SIMD flags | inflate-bound | **DISCARD** |
+| 179 | libjpeg-turbo / libwebp | already SIMD if installed | **ALREADY** |
+| 180 | Python `json.loads` 10 MiB | no SIMD layer | **DISCARD** |
+| 181 | Python `pickle` 1M tuples | opcode VM | **DISCARD** |
+| 182 | Python `re.findall` 16 MiB | `_sre` | **DISCARD** |
+| 183 | Python `bytes.translate` / `encode` | already C | **ALREADY** |
+| 184 | Python `io` default 8 KiB | app sets `buffering=` | **DISCARD** as default |
+| 185 | splice/tee 32 MiB vs `read` 256 KiB | extra copy for most CLIs | **DISCARD** |
+| 186 | `pread` vs `read` 32 MiB | same cached bandwidth | **DISCARD** |
+| 187 | `O_DIRECT` 256 KiB | slower than page cache here | **DISCARD** |
+| 188 | `writev` vs `write` 256 KiB | same plateau | **DISCARD** |
+| 189 | io_uring in coreutils | not a small patch; `fio` not required | **DISCARD** |
+| 190 | `sha256sum` vs `openssl dgst` | both libcrypto | **ALREADY** |
+| 191 | missing cksum ifunc (zlib-style CPUID) | already prints PCLMUL | **ALREADY** |
+| 192 | `top -b -n1` / `ps -eL` | `/proc` open/close | **DISCARD** |
+| 193 | `strings` / `xxd` 16 MiB | format | **DISCARD** |
+| 194 | SO_RCVBUF <8 KiB in curl/wget/git | not found as a local-file win | **DISCARD** |
+| 195 | TFO/BBR as defaults | WAN-only | **DISCARD** |
+| 196 | `LC_ALL=C` default again | user-settable; 1.05× sort | **DISCARD** |
+| 197 | gconv UTF-16/32 `.so` missing SIMD | modules exist; not the UTF-8 path | **ALREADY** |
+| 198 | `yes` 256 KiB again | already patched | **ALREADY** |
+| 199 | `head` backward `BUFSIZ` | extra EOF read; #64 | **DISCARD** |
+| 200 | `tail` backward `BUFSIZ` | same | **DISCARD** |
+| 201 | `wc_avx2` 16320 B chunk | already AVX2 `wc -l` | **ALREADY** |
+| 202 | pigz-local buffer | inherits `libz` | **DISCARD** |
+| 203 | brotli `-q 1` I/O | encoder-bound | **DISCARD** |
+| 204 | `envsubst` / gettext 16 MiB | parse | **DISCARD** |
+| 205 | `getopt` / `flock` / `logger` | not throughput | **DISCARD** |
+| 206 | `ionice` / `taskset` defaults | policy, not userspace | **DISCARD** |
+| 207 | `bsdtar` / libarchive if present | `tar` already 256 KiB records | **DISCARD** |
+| 208 | `less +F` dump | interactive | **DISCARD** |
+| 209 | `sha3sum` if present | OpenSSL if present | **ALREADY** |
+| 210 | `sum` (BSD/sysv) | small/legacy | **DISCARD** |
+| 211 | `crc32` standalone | `cksum` already PCLMUL | **ALREADY** |
+| 212 | Python `os.walk` `/usr/lib/python3.12` | stat-bound | **DISCARD** |
+| 213 | glibc `memcpy` again | AVX2/AVX-512 ifunc | **ALREADY** |
+
+Wave 2 score added to the running totals below. Still **no new source patch**.
 
 ## How to reproduce
 
