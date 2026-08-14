@@ -190,4 +190,20 @@ assert.match(promptPatch, /_promptsHandler\?\.destroy\(\)/);
 assert.match(promptPatch, /unwatch_name/);
 assert.match(promptPatch, /if \(!lastFocusedSnapWindow \|\| !this\._promptWindow\)/);
 
+{
+  function xidArgs(getWindow) {
+    const cmd = [];
+    const window = getWindow();
+    if (window != null)
+      cmd.push(String(window.xid));
+    return cmd;
+  }
+  assert.deepEqual(xidArgs(() => null), []);
+  assert.deepEqual(xidArgs(() => ({xid: 42})), ['42']);
+}
+
+const umPatch = readFileSync(
+  join(here, '../patches/update-manager-null-xid.patch'), 'utf8');
+assert.match(umPatch, /if window is not None/);
+
 console.log('search-providers.test.mjs: all assertions passed');

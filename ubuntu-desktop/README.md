@@ -39,6 +39,9 @@ patch -p1 < ../../patches/nautilus-xdg-terminal-exec-leak.patch
 cd ../gnome-shell-ubuntu-extensions-50.26.04.7ubuntu
 patch -p1 < ../../patches/desktop-icons-ng-clearwindow-idempotent.patch
 patch -p1 < ../../patches/snapd-prompting-teardown.patch
+
+cd ../update-manager-26.04.5
+patch -p1 < ../../patches/update-manager-null-xid.patch
 ```
 
 ## Tests

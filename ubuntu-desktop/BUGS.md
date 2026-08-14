@@ -3,6 +3,12 @@
 Researched against the Resolute 26.04.1 source trees fetched into `src/`.
 Performance / I/O / SIMD issues are out of scope (see `ubuntu24/`).
 
+## Fixed here (`patches/update-manager-null-xid.patch`)
+
+`UpdateManager.show_settings()` on X11 called `self.get_window().get_xid()`
+with no realize check. After `hide()` (install backend pane) that is
+`AttributeError: 'NoneType' object has no attribute 'get_xid'`.
+
 ## Fixed here (`patches/snapd-prompting-teardown.patch`)
 
 Snap prompting `disable()` destroyed the D-Bus server before `PromptsHandler`,

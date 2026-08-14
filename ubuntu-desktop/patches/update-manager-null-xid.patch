@@ -1,0 +1,23 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: UpdateManager: do not call get_xid() on a NULL GdkWindow
+
+show_settings() on X11 did self.get_window().get_xid() without checking
+that the Gtk window was realized. After hide() or before map that is a
+Python AttributeError and Settings never opens.
+
+Forwarded: no
+---
+--- a/UpdateManager/UpdateManager.py
++++ b/UpdateManager/UpdateManager.py
+@@ -206,7 +206,9 @@
+                "--open-tab", str(page_number)]
+ 
+         if "WAYLAND_DISPLAY" not in os.environ:
+-            cmd += ["--toplevel", "%s" % self.get_window().get_xid()]
++            window = self.get_window()
++            if window is not None:
++                cmd += ["--toplevel", "%s" % window.get_xid()]
+ 
+         try:
+             p = Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE)
