@@ -3,6 +3,14 @@
 Researched against the Resolute 26.04.1 source trees fetched into `src/`.
 Performance / I/O / SIMD issues are out of scope (see `ubuntu24/`).
 
+## Fixed here (`patches/snapd-prompting-teardown.patch`)
+
+Snap prompting `disable()` destroyed the D-Bus server before `PromptsHandler`,
+so lock-screen teardown raced in-flight `prompt-request` signals.
+`PromptsHandler.destroy()` left `WindowsGroup` actors and a `watch_name`
+alive. `_adjustPromptPosition()` called `get_frame_rect()` when every snap
+window was already gone.
+
 ## Fixed here (`patches/desktop-icons-ng-clearwindow-idempotent.patch`)
 
 Desktop Icons NG `emulateX11WindowType._clearWindow()` is not idempotent.

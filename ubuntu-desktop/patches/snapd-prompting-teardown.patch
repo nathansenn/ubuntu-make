@@ -1,0 +1,77 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: snapd-prompting: tear down handler before D-Bus and null-check windows
+
+disable() destroyed the D-Bus server before PromptsHandler, so lock-screen
+disable raced against in-flight prompt-request. destroy() leaked window
+groups and the bus name watch. _adjustPromptPosition crashed when every
+snap window had already gone.
+
+Forwarded: no
+---
+--- a/subprojects/snapd-prompting/snapd-prompting@canonical.com/extension.js
++++ b/subprojects/snapd-prompting/snapd-prompting@canonical.com/extension.js
+@@ -38,9 +38,9 @@
+     }
+ 
+     disable() {
+-        this._dbusServer?.destroy();
+-        this._dbusServer = null;
+         this._promptsHandler?.destroy();
+         this._promptsHandler = null;
++        this._dbusServer?.destroy();
++        this._dbusServer = null;
+     }
+ }
+--- a/subprojects/snapd-prompting/snapd-prompting@canonical.com/promptsHandler.js
++++ b/subprojects/snapd-prompting/snapd-prompting@canonical.com/promptsHandler.js
+@@ -68,7 +68,7 @@
+ 
+         this._windowsTracker = Shell.WindowTracker.get_default();
+ 
+-        Gio.DBus.watch_name(Gio.BusType.SESSION,
++        this._nameWatchId = Gio.DBus.watch_name(Gio.BusType.SESSION,
+             DEFAULT_PROMPTING_DBUS_NAME,
+             Gio.BusNameWatcherFlags.NONE,
+             (_, _c, owner) => (this._promptDialogName = owner),
+@@ -178,10 +178,18 @@
+     }
+ 
+     destroy() {
++        this._windowsGroups.splice(0).forEach(wg => wg.destroy());
++        this._pendingRequests.forEach(req => GLib.source_remove(req.timeoutID));
++        this._pendingRequests = [];
++
++        if (this._nameWatchId) {
++            Gio.DBus.unwatch_name(this._nameWatchId);
++            this._nameWatchId = 0;
++        }
++
+         this._windowsTracker = null;
+-        this._injectionManager.clear();
++        this._injectionManager?.clear();
+         this._injectionManager = null;
+-        this._pendingRequests.forEach(req => GLib.source_remove(req.timeoutID));
+ 
+         super.destroy();
+     }
+--- a/subprojects/snapd-prompting/snapd-prompting@canonical.com/windowsGroup.js
++++ b/subprojects/snapd-prompting/snapd-prompting@canonical.com/windowsGroup.js
+@@ -180,6 +180,8 @@
+ 
+     _moveResizeLastFocusedSnapWindow(x, y, width, height) {
+         const lastFocusedSnapWindow = this._lastFocusedSnapWindow();
++        if (!lastFocusedSnapWindow)
++            return;
+         this._lastFocusedSnapWindowChangesSignals?.destroy();
+         lastFocusedSnapWindow.move_resize_frame(
+             true,
+@@ -193,6 +195,8 @@
+ 
+     _adjustPromptPosition() {
+         const lastFocusedSnapWindow = this._lastFocusedSnapWindow();
++        if (!lastFocusedSnapWindow || !this._promptWindow)
++            return;
+         const promptWindowFrameRect = this._promptWindow.get_frame_rect();
+         const frameRect = lastFocusedSnapWindow.get_frame_rect();
+ 

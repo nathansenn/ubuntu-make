@@ -169,4 +169,25 @@ const dingPatch = readFileSync(
 assert.match(dingPatch, /if \(!ding\)/);
 assert.match(dingPatch, /customJS_ding\?\.refreshState/);
 
+{
+  function disable(order) {
+    const log = [];
+    const objs = {handler: true, dbus: true};
+    for (const name of order) {
+      if (!objs[name])
+        throw new Error(`destroyed ${name} after it was already gone`);
+      objs[name] = false;
+      log.push(name);
+    }
+    return log;
+  }
+  assert.deepEqual(disable(['handler', 'dbus']), ['handler', 'dbus']);
+}
+
+const promptPatch = readFileSync(
+  join(here, '../patches/snapd-prompting-teardown.patch'), 'utf8');
+assert.match(promptPatch, /_promptsHandler\?\.destroy\(\)/);
+assert.match(promptPatch, /unwatch_name/);
+assert.match(promptPatch, /if \(!lastFocusedSnapWindow \|\| !this\._promptWindow\)/);
+
 console.log('search-providers.test.mjs: all assertions passed');
