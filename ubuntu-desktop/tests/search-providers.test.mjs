@@ -206,4 +206,28 @@ const umPatch = readFileSync(
   join(here, '../patches/update-manager-null-xid.patch'), 'utf8');
 assert.match(umPatch, /if window is not None/);
 
+{
+  function lastDeviceIsTouchscreen(device) {
+    if (!device)
+      return false;
+    try {
+      return device.get_device_type() === 'touch';
+    } catch {
+      return false;
+    }
+  }
+  assert.equal(lastDeviceIsTouchscreen(null), false);
+  assert.equal(lastDeviceIsTouchscreen({
+    get_device_type() {
+      throw new Error('already disposed');
+    },
+  }), false);
+  assert.equal(lastDeviceIsTouchscreen({get_device_type: () => 'touch'}), true);
+}
+
+const kbdPatch = readFileSync(
+  join(here, '../patches/gnome-shell-disposed-last-device.patch'), 'utf8');
+assert.match(kbdPatch, /device-removed/);
+assert.match(kbdPatch, /already disposed/);
+
 console.log('search-providers.test.mjs: all assertions passed');

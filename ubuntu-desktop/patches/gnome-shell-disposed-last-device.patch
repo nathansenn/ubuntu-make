@@ -1,0 +1,57 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: keyboard: do not query a disposed last input device
+
+KeyboardManager kept a MetaInputDeviceNative* after the seat destroyed
+it (logout / GDM greeter). _lastDeviceIsTouchscreen() then threw
+"already disposed" and left the OSK / greeter unresponsive
+(LP #2125720 class).
+
+Clear _lastDevice on device-removed and catch disposed access.
+
+Bug-Ubuntu: https://launchpad.net/bugs/2125720
+Forwarded: no
+---
+--- a/js/ui/keyboard.js
++++ b/js/ui/keyboard.js
+@@ -1056,12 +1056,22 @@
+ 
+         this._lastDevice = null;
+         global.backend.connect('last-device-changed', (backend, device) => {
+-            if (device.device_type === Clutter.InputDeviceType.KEYBOARD_DEVICE)
++            try {
++                if (device.device_type === Clutter.InputDeviceType.KEYBOARD_DEVICE)
++                    return;
++            } catch (e) {
+                 return;
++            }
+ 
+             this._lastDevice = device;
+             this._syncEnabled();
+         });
++        this._seat.connect('device-removed', (_seat, device) => {
++            if (this._lastDevice === device) {
++                this._lastDevice = null;
++                this._syncEnabled();
++            }
++        });
+ 
+         const allowedModes = Shell.ActionMode.ALL & ~Shell.ActionMode.LOCK_SCREEN;
+         const bottomDragGesture = new Shell.EdgeDragGesture({
+@@ -1090,8 +1100,14 @@
+         if (!this._lastDevice)
+             return false;
+ 
+-        const deviceType = this._lastDevice.get_device_type();
+-        return deviceType === Clutter.InputDeviceType.TOUCHSCREEN_DEVICE;
++        try {
++            const deviceType = this._lastDevice.get_device_type();
++            return deviceType === Clutter.InputDeviceType.TOUCHSCREEN_DEVICE;
++        } catch (e) {
++            // Device was destroyed from C (logout / seat reset).
++            this._lastDevice = null;
++            return false;
++        }
+     }
+ 
+     _syncEnabled() {

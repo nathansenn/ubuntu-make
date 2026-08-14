@@ -6,3 +6,4 @@ nautilus-xdg-terminal-exec-leak.patch
 desktop-icons-ng-clearwindow-idempotent.patch
 snapd-prompting-teardown.patch
 update-manager-null-xid.patch
+gnome-shell-disposed-last-device.patch

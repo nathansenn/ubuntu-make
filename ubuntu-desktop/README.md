@@ -32,6 +32,7 @@ patch -p1 < ../../patches/gnome-shell-ubuntu-extensions-search-providers.patch
 
 cd ../gnome-shell-50.1
 patch -p1 < ../../patches/gnome-shell-unguarded-splice.patch
+patch -p1 < ../../patches/gnome-shell-disposed-last-device.patch
 
 cd ../nautilus-50.2.2
 patch -p1 < ../../patches/nautilus-xdg-terminal-exec-leak.patch

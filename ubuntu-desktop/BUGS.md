@@ -3,6 +3,14 @@
 Researched against the Resolute 26.04.1 source trees fetched into `src/`.
 Performance / I/O / SIMD issues are out of scope (see `ubuntu24/`).
 
+## Fixed here (`patches/gnome-shell-disposed-last-device.patch`)
+
+`KeyboardManager` kept the last `MetaInputDeviceNative` after the seat
+destroyed it (logout / GDM greeter). `_lastDeviceIsTouchscreen()` then
+threw "already disposed" (journal from LP #2125720) and left the OSK /
+password entry unresponsive. Clear on `device-removed` and catch disposed
+access.
+
 ## Fixed here (`patches/update-manager-null-xid.patch`)
 
 `UpdateManager.show_settings()` on X11 called `self.get_window().get_xid()`
