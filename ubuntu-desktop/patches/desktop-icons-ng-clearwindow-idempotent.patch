@@ -1,0 +1,58 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: ding: do not clear an already-cleared desktop window
+
+disable() and the MetaWindow "unmanaged" handler can both call
+_clearWindow() for the same window (lock screen / extension disable).
+The second call dereferenced a null customJS_ding. Make _clearWindow
+idempotent and skip refresh on windows that already dropped their
+emulator.
+
+Forwarded: no
+---
+--- a/subprojects/desktop-icons-ng/emulateX11WindowType.js
++++ b/subprojects/desktop-icons-ng/emulateX11WindowType.js
+@@ -380,20 +380,30 @@
+         });
+         this._windowList.push(window);
+         window.customJS_ding.unmanagedID = window.connect('unmanaged', window => {
+-            window.customJS_ding.windowUnmanaged = true;
++            if (window.customJS_ding)
++                window.customJS_ding.windowUnmanaged = true;
+             this._clearWindow(window);
+             this._windowList = this._windowList.filter(item => item !== window);
+         });
+     }
+ 
+     refreshWindowsPosition() {
+-        this._windowList.forEach(window => {window.customJS_ding.refreshWindowPosition();});
++        this._windowList.forEach(window => {
++            window.customJS_ding?.refreshWindowPosition();
++        });
+     }
+ 
+     _clearWindow(window) {
+-        window.disconnect(window.customJS_ding.unmanagedID);
+-        window.customJS_ding.disconnect();
++        const ding = window.customJS_ding;
++        if (!ding)
++            return;
++
+         window.customJS_ding = null;
++        if (ding.unmanagedID) {
++            window.disconnect(ding.unmanagedID);
++            ding.unmanagedID = 0;
++        }
++        ding.disconnect();
+     }
+ 
+     _refreshWindows(checkWorkspace) {
+@@ -401,7 +411,7 @@
+             this._activate_window_ID = GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                 if (this._enableRefresh) {
+                     for (let window of this._windowList) {
+-                        window.customJS_ding.refreshState(checkWorkspace);
++                        window.customJS_ding?.refreshState(checkWorkspace);
+                     }
+                     if (checkWorkspace) {
+                         // activate the top-most window

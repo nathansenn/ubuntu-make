@@ -3,3 +3,4 @@
 gnome-shell-ubuntu-extensions-search-providers.patch
 gnome-shell-unguarded-splice.patch
 nautilus-xdg-terminal-exec-leak.patch
+desktop-icons-ng-clearwindow-idempotent.patch

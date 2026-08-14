@@ -3,6 +3,13 @@
 Researched against the Resolute 26.04.1 source trees fetched into `src/`.
 Performance / I/O / SIMD issues are out of scope (see `ubuntu24/`).
 
+## Fixed here (`patches/desktop-icons-ng-clearwindow-idempotent.patch`)
+
+Desktop Icons NG `emulateX11WindowType._clearWindow()` is not idempotent.
+`disable()` (lock screen) walks `_windowList` while an `unmanaged` handler
+can clear the same MetaWindow. The second call reads `window.customJS_ding`
+after it was set to null and throws, taking down the desktop icons surface.
+
 ## Fixed here (`patches/gnome-shell-unguarded-splice.patch`)
 
 Same class as LP #2161808, still present in gnome-shell 50.1-0ubuntu1.2

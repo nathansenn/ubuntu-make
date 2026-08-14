@@ -35,6 +35,9 @@ patch -p1 < ../../patches/gnome-shell-unguarded-splice.patch
 
 cd ../nautilus-50.2.2
 patch -p1 < ../../patches/nautilus-xdg-terminal-exec-leak.patch
+
+cd ../gnome-shell-ubuntu-extensions-50.26.04.7ubuntu
+patch -p1 < ../../patches/desktop-icons-ng-clearwindow-idempotent.patch
 ```
 
 ## Tests

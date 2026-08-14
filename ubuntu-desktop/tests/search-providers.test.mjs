@@ -151,4 +151,22 @@ assert.match(nautilusPatch, /xdg_terminal_exec_app == NULL/);
 assert.match(nautilusPatch, /error != NULL \? error->message/);
 assert.match(nautilusPatch, /g_autolist \(GFile\)/);
 
+{
+  function clearWindow(window) {
+    const ding = window.customJS_ding;
+    if (!ding)
+      return 'skipped';
+    window.customJS_ding = null;
+    return 'cleared';
+  }
+  const window = {customJS_ding: {unmanagedID: 1}};
+  assert.equal(clearWindow(window), 'cleared');
+  assert.equal(clearWindow(window), 'skipped');
+}
+
+const dingPatch = readFileSync(
+  join(here, '../patches/desktop-icons-ng-clearwindow-idempotent.patch'), 'utf8');
+assert.match(dingPatch, /if \(!ding\)/);
+assert.match(dingPatch, /customJS_ding\?\.refreshState/);
+
 console.log('search-providers.test.mjs: all assertions passed');
