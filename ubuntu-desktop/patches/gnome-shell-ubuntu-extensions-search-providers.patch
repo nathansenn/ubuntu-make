@@ -1,0 +1,259 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: Harden Ubuntu overview search providers
+
+The Web Search Provider and Snap Search Provider extensions reach into
+gnome-shell private SearchResults APIs. Combined with silent parental-
+controls refusal and lock-screen enable/disable, that:
+
+  * unregisters a provider that was never registered, which on
+    gnome-shell before 50.1-0ubuntu1.2 splices index -1 and drops an
+    arbitrary other provider (LP: #2150103, #2161808, #2156486);
+  * throws against an already-disposed ListSearchResults after overview
+    recreation;
+  * races enable() after await getDefaultBrowser() with disable().
+
+This patch:
+
+  * uses the public SearchController addProvider/removeProvider API;
+  * tracks whether registration actually attached a display;
+  * only unregisters a provider that was registered;
+  * aborts web-search enable() if disable() cancelled the Gio.Cancellable;
+  * fixes SnapFinderSearchProvider.get_id throwing TypeError (LP: #2150265);
+  * stops advertising the in-process snap finder as a remote provider so
+    AppSystem 'installed-changed' does not drop it forever;
+  * assigns the snap: URI handler before launch_uris_async.
+
+Bug-Ubuntu: https://launchpad.net/bugs/2150103
+Bug-Ubuntu: https://launchpad.net/bugs/2150265
+Bug-Ubuntu: https://launchpad.net/bugs/2156486
+Bug-Ubuntu: https://launchpad.net/bugs/2161808
+Forwarded: no
+---
+ subprojects/web-search-provider/web-search-provider@ubuntu.com/extension.js | 0
+ subprojects/snapd-search-provider/snapd-search-provider@canonical.com/extension.js | 0
+ subprojects/snapd-search-provider/snapd-search-provider@canonical.com/snapFinderSearchProvider.js | 0
+ 3 files changed
+
+--- a/subprojects/web-search-provider/web-search-provider@ubuntu.com/extension.js
++++ b/subprojects/web-search-provider/web-search-provider@ubuntu.com/extension.js
+@@ -23,25 +23,33 @@
+ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+ export * as Util from 'resource:///org/gnome/shell/misc/util.js';
+ 
+-export default class SnapdSearchProviderExtension extends Extension {
++function isCancelled(error) {
++  return error?.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED);
++}
++
++export default class WebSearchProviderExtension extends Extension {
+   async enable() {
+     const cancellable = new Gio.Cancellable();
+     this._cancellable = cancellable;
++    this._registered = false;
+ 
+     try {
+       const defaultBrowser = await WebSearcherSearchProvider.getDefaultBrowser(cancellable);
+ 
++      // disable() may have run while we awaited the default browser.
++      if (cancellable.is_cancelled())
++        return;
++
+       // Ignore if default browser is Web as it already provides a search provider...
+       if (!defaultBrowser || defaultBrowser.get_id() === 'org.gnome.Epiphany.desktop') {
+         log('No default browser found or default browser is Web, skipping web search provider');
+-        delete this._cancellable;
+         return;
+       }
+ 
+       this.webSearcher = new WebSearcherSearchProvider(defaultBrowser, cancellable);
+-      this.searchResults._registerProvider(this.webSearcher);
++      this._registered = this._tryAddProvider(this.webSearcher);
+     } catch (error) {
+-      if (error.matches(Gio.IOErrorEnum.CANCELLED))
++      if (isCancelled(error))
+         return;
+ 
+       logError(error, 'Error while enabling web search provider');
+@@ -53,13 +61,47 @@
+     delete this._cancellable;
+ 
+     if (this.webSearcher) {
+-      this.searchResults._unregisterProvider(this.webSearcher);
+-      this.webSearcher?.destroy();
++      if (this._registered)
++        this._tryRemoveProvider(this.webSearcher);
++      this._registered = false;
++      this.webSearcher.destroy();
+       delete this.webSearcher;
+     }
+   }
+ 
+-  get searchResults() {
+-    return Main.overview._overview.controls._searchController._searchResults;
++  _tryAddProvider(provider) {
++    try {
++      const searchController = this.searchController;
++      if (!searchController)
++        return false;
++
++      searchController.addProvider(provider);
++      // Parental controls can refuse registration without throwing. The
++      // shell only attaches a display after a successful register; if we
++      // still call removeProvider() for a refused provider, older
++      // gnome-shell splices index -1 and drops an unrelated provider
++      // (LP: #2150103, #2161808).
++      return !!provider.display;
++    } catch (error) {
++      logError(error, 'Failed to register web search provider');
++      return false;
++    }
++  }
++
++  _tryRemoveProvider(provider) {
++    try {
++      this.searchController?.removeProvider(provider);
++    } catch (error) {
++      logError(error, 'Failed to unregister web search provider');
++    }
++  }
++
++  get searchController() {
++    try {
++      return Main.overview?.searchController ?? null;
++    } catch (error) {
++      logError(error, 'SearchController is not available');
++      return null;
++    }
+   }
+ }
+--- a/subprojects/snapd-search-provider/snapd-search-provider@canonical.com/extension.js
++++ b/subprojects/snapd-search-provider/snapd-search-provider@canonical.com/extension.js
+@@ -29,29 +29,54 @@
+             return;
+         }
+ 
++        this._registered = false;
+         this.snapFinder = new SnapFinderSearchProvider();
+-        this._registerProvider(this.snapFinder);
++        this._registered = this._tryAddProvider(this.snapFinder);
++        if (this._registered)
++            this.snapFinder.init();
+     }
+ 
+     disable() {
+         if (!this.snapFinder)
+             return;
+ 
+-        this._unregisterProvider(this.snapFinder);
++        if (this._registered)
++            this._tryRemoveProvider(this.snapFinder);
++        this._registered = false;
++        this.snapFinder.destroy();
+         delete this.snapFinder;
+     }
+ 
+-    _registerProvider(provider) {
+-        this.searchResults._registerProvider(provider);
+-        provider.init();
++    _tryAddProvider(provider) {
++        try {
++            const searchController = this.searchController;
++            if (!searchController)
++                return false;
++
++            searchController.addProvider(provider);
++            // Parental controls can refuse registration without throwing.
++            // Only treat the provider as live if the shell attached a display.
++            return !!provider.display;
++        } catch (error) {
++            logError(error, 'Failed to register snap search provider');
++            return false;
++        }
+     }
+ 
+-    _unregisterProvider(provider) {
+-        this.searchResults._unregisterProvider(provider);
+-        provider.destroy();
++    _tryRemoveProvider(provider) {
++        try {
++            this.searchController?.removeProvider(provider);
++        } catch (error) {
++            logError(error, 'Failed to unregister snap search provider');
++        }
+     }
+ 
+-    get searchResults() {
+-        return Main.overview._overview.controls._searchController._searchResults;
++    get searchController() {
++        try {
++            return Main.overview?.searchController ?? null;
++        } catch (error) {
++            logError(error, 'SearchController is not available');
++            return null;
++        }
+     }
+ }
+--- a/subprojects/snapd-search-provider/snapd-search-provider@canonical.com/snapFinderSearchProvider.js
++++ b/subprojects/snapd-search-provider/snapd-search-provider@canonical.com/snapFinderSearchProvider.js
+@@ -25,12 +25,17 @@
+ const SNAP_STORE_DESKTOP_ID = 'snap-store_snap-store.desktop';
+ 
+ Gio._promisify(Snapd.Client.prototype, 'find_async');
++Gio._promisify(Gio.AppInfo.prototype, 'launch_uris_async');
+ 
+ export class SnapFinderSearchProvider /* extends SearchProvider */ {
+     constructor() {
+         const { snapProtoHandler } = SnapFinderSearchProvider;
+ 
+-        if (snapProtoHandler?.should_show())
++        // Gio.AppInfo (the snap: URI fallback) has no should_show(); only
++        // skip a DesktopAppInfo that is explicitly hidden.
++        if (snapProtoHandler &&
++            (typeof snapProtoHandler.should_show !== 'function' ||
++             snapProtoHandler.should_show()))
+             this.appInfo = snapProtoHandler;
+ 
+         this._client = new Snapd.Client();
+@@ -38,6 +43,9 @@
+     }
+ 
+     init() {
++        if (!this.display)
++            return;
++
+         this._displayConnectId = this.display.connect('notify::visible', () =>
+                 this._searchResults.clear());
+         this.display.connect('destroy', () => (this._displayConnectId = 0));
+@@ -61,12 +69,15 @@
+     }
+ 
+     get id() {
+-        return this.appInfo?.get_id() ?? SnapFinderSearchProvider?.get_id() ??
+-            'snapd-search-provider';
++        // SnapFinderSearchProvider.get_id is not a function (LP: #2150265).
++        return this.appInfo?.get_id() ?? 'snapd-search-provider';
+     }
+ 
+     get isRemoteProvider() {
+-        return true;
++        // This is an in-process provider. Returning true makes gnome-shell
++        // drop it on every AppSystem 'installed-changed' reload and never
++        // add it back (only D-Bus remotes are reloaded).
++        return false;
+     }
+ 
+     get canLaunchSearch() {
+@@ -176,9 +187,11 @@
+             const { snapProtoHandler } = SnapFinderSearchProvider;
+ 
+             if (!snapProtoHandler) {
+-                logError(new Error("Impossible to find a default browser in this system"));
++                logError(new Error('Impossible to find a snap URI handler on this system'));
+                 return;
+             }
++
++            snapHandler = snapProtoHandler;
+         }
+ 
+         try {

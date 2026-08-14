@@ -46,3 +46,24 @@ debian/files
 debian/*substvars
 debian/*.debhelper
 debian/*.1
+
+# Ubuntu 24.04 CLI userspace source trees and apt orig tarballs
+ubuntu24/src/
+ubuntu24/**/*.dsc
+ubuntu24/**/*.orig.tar.*
+ubuntu24/**/*.debian.tar.*
+
+# Ubuntu 26.04.1 desktop source trees and apt orig tarballs
+ubuntu-desktop/src/
+ubuntu-desktop/**/*.dsc
+ubuntu-desktop/**/*.orig.tar.*
+ubuntu-desktop/**/*.debian.tar.*
+ubuntu-desktop/**/*.tar.xz
+
+# Local apt leftovers at the workspace root
+/coreutils-*/
+/coreutils_*.dsc
+/coreutils_*.tar.*
+/glibc_*.dsc
+/glibc_*.tar.*
+/{FILE8}

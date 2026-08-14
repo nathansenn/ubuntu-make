@@ -1,0 +1,7 @@
+# Unpacked apt source and orig tarballs — only patches/docs/tests are committed.
+src/
+*.dsc
+*.orig.tar.*
+*.debian.tar.*
+*.tar.xz
+*.tar.gz
