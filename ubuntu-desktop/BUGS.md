@@ -209,6 +209,54 @@ AT-SPI text events can have `any_data=None`. Typing echo, live regions,
 chat, terminal utilities, and event-reason helpers called `.lower()` /
 `.strip()` / `"in"` on it and took Orca down.
 
+## Fixed here (`patches/mutter-xwayland-dnd-null.patch`)
+
+X11 display close freed the XWayland DnD manager while grab handlers
+could still run. Enter/release/dest callbacks also used a NULL dnd
+object or `dnd_data_source`.
+
+## Fixed here (`patches/ptyxis-close-null-terminal.patch`)
+
+Async close-tab dialog resolved the ancestor window after teardown.
+Agent poll, save-size, grab-focus, and notify destroy used a NULL
+terminal widget.
+
+## Fixed here (`patches/gnome-software-snap-null-progress.patch`)
+
+Snap `progress_cb` divided by a zero total and walked a NULL task
+array. App/media refine and markdown description did the same with
+NULL GPtrArrays. Flatpak size refine passed a NULL runtime.
+
+## Fixed here (`patches/software-properties-none-guards.patch`)
+
+D-Bus ToggleSourceUse / EnableChildSource crashed on unknown lines.
+Driver apply used `candidate.ver_str` when apt had no candidate. Qt
+mirror dialog assumed `currentItem()`.
+
+## Fixed here (`patches/gdm-session-conversation-teardown.patch`)
+
+Logout cancelled conversations without completing BeginVerification
+or worker queries (greeter hang). SessionExited cleared a newer
+conversation pointer. `get_session_id` ignored `session_opened`.
+
+## Fixed here (`patches/update-notifier-null-hooks.patch`)
+
+`g_spawn_sync` stderr can be NULL (live-CD path). Hook RFC822
+continuation before any header, missing Description, and a failed
+`/proc/uptime` read crashed the daemon.
+
+## Fixed here (`patches/gsd-power-lid-null.patch`)
+
+Lid close queried DisplayConfig with a NULL proxy and logged a NULL
+GError. Inhibit/suspend finish and ScreenSaver lock had the same
+gap.
+
+## Fixed here (`patches/gnome-control-center-display-wacom-network.patch`)
+
+Display panel init logged `error->message` when finish left error
+NULL. Wacom mock-stylus idle and output combo used empty/stale
+models. QR/Wi-Fi rows assumed NM wireless/connection settings exist.
+
 ## Looked at, not changed
 
 - Dash-to-dock lock-screen watchdog and a11y focus: already updated in
@@ -217,8 +265,8 @@ chat, terminal utilities, and event-reason helpers called `.lower()` /
   (LP #2147581).
 - AppIndicator lock-screen name-own race: documented FIXME, watchdog already
   present; no new evidence it is still broken.
-- Remaining mutter Wayland leftover-resource / NULL actor paths and
-  gnome-software snap `progress_cb` SIGFPE are still open.
+- Remaining mutter Wayland leftover-resource / NULL actor paths
+  (touch cancel, xwayland regions) are still open.
 
 ## Seed coverage
 

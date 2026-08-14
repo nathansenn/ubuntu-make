@@ -1,0 +1,95 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: update/hooks: tolerate empty stderr and malformed hook files
+
+g_spawn_sync can leave stderr NULL; strlen(ret) crashed on the
+live-CD path. Folded RFC822 lines before any header, missing
+Description/Name, and a failed /proc/uptime read also crashed.
+
+Forwarded: no
+---
+--- a/src/update.c	2026-07-23 12:34:40.000000000 +0000
++++ b/src/update.c	2026-08-14 09:06:28.363871897 +0000
+@@ -634,14 +634,14 @@
+ 
+       // check if we are running from the live-cd, it
+       // symlinks apt-check to /bin/true
+-      if(exit_status == 0 && strlen(ret) == 0 &&
++      if(exit_status == 0 && (ret == NULL || ret[0] == '\0') &&
+ 	 g_file_test (UPGRADE_CHECKER, G_FILE_TEST_IS_SYMLINK) ) {
+ 	 g_free(ret);
+ 	 return TRUE;
+       }
+ 
+       // read the value from childs stderr, E: indicates a problem
+-      if(ret[0] == 'E') {
++      if(ret != NULL && ret[0] == 'E') {
+ 	 GString *error = g_string_new("");
+ 	 if(strlen(ret) > 3) 
+ 	    g_string_append_printf(error,
+--- a/src/rfc822.c	2024-10-24 10:05:45.000000000 +0000
++++ b/src/rfc822.c	2026-08-14 09:06:28.675872099 +0000
+@@ -48,12 +48,16 @@
+ 	    *(tmp+1) != 0 && *(tmp+1) == '.' &&
+ 	    *(tmp+2) == 0)
+ 	{
++	   if (cur == NULL)
++	      continue;
+ 	   gchar *now = cur->value;
+ 	   cur->value = g_strconcat(now, "\n", NULL);
+ 	   g_free(now);
+ 	}
+ 	else if (isspace(*tmp))
+         {
++	   if (cur == NULL)
++	      continue;
+ 	   gchar *now = cur->value;
+ 	   if(strlen(now) == 0 || g_str_has_suffix(now, " ") || g_str_has_suffix(now, "\n"))
+ 	      cur->value = g_strconcat(now, g_strstrip(tmp), NULL);
+--- a/src/hooks.c	2026-05-19 10:26:48.000000000 +0000
++++ b/src/hooks.c	2026-08-14 09:06:29.043872339 +0000
+@@ -255,6 +255,8 @@
+    entry = rfc822_header_lookup(rfc822, "GettextDomain");
+    if(entry != NULL) {
+       text =  rfc822_header_lookup(rfc822, field);
++      if(text == NULL)
++	 return NULL;
+       s = dgettext(entry, text);
+       if(text != s)
+ 	 return s;
+@@ -390,6 +392,8 @@
+    char *summary = hook_description_get_summary(rfc822);
+    char *descr = hook_description_get_description(rfc822);
+    char *s;
++   if (descr == NULL)
++      descr = "";
+    if(summary) {
+       s = g_strdup_printf("%s\n\n%s\n",gettext(summary), gettext(descr));
+       gtk_text_buffer_set_text(buf, s, -1);
+@@ -660,14 +664,18 @@
+       // read the uptime information
+       double uptime=0, idle=0;
+       char buf[1024];
+-      int fd = open("/proc/uptime", 0);
+-      int local_n = read(fd, buf, sizeof(buf)-1);
+-      buf[local_n] = '\0';
+-      g_autofree char *savelocale = g_strdup(setlocale(LC_NUMERIC, NULL));
+-      setlocale(LC_NUMERIC,"C");
+-      sscanf(buf, "%lf %lf", &uptime,&idle);
+-      close(fd);
+-      setlocale(LC_NUMERIC,savelocale);
++      int fd = open("/proc/uptime", O_RDONLY);
++      if (fd >= 0) {
++	 ssize_t local_n = read(fd, buf, sizeof(buf)-1);
++	 if (local_n > 0) {
++	    buf[local_n] = '\0';
++	    g_autofree char *savelocale = g_strdup(setlocale(LC_NUMERIC, NULL));
++	    setlocale(LC_NUMERIC,"C");
++	    sscanf(buf, "%lf %lf", &uptime,&idle);
++	    setlocale(LC_NUMERIC,savelocale);
++	 }
++	 close(fd);
++      }
+ 
+       time_t mtime = hook_file_time(hook_file);
+       time_t now = time(NULL);

@@ -357,4 +357,57 @@ const orcaPatch = readFileSync(
   join(here, '../patches/orca-any-data-none.patch'), 'utf8');
 assert.match(orcaPatch, /isinstance\(event\.any_data, str\)/);
 
+{
+  function progress(tasks, total) {
+    if (!tasks)
+      return 'unknown';
+    if (total <= 0)
+      return 'unknown';
+    return Math.floor(100 * 1 / total);
+  }
+  assert.equal(progress(null, 0), 'unknown');
+  assert.equal(progress([], 0), 'unknown');
+  assert.equal(progress(['t'], 4), 25);
+}
+
+const mutterPatch = readFileSync(
+  join(here, '../patches/mutter-xwayland-dnd-null.patch'), 'utf8');
+assert.match(mutterPatch, /if \(!dnd\)/);
+assert.match(mutterPatch, /meta_xwayland_end_dnd_grab/);
+
+const ptyxisPatch = readFileSync(
+  join(here, '../patches/ptyxis-close-null-terminal.patch'), 'utf8');
+assert.match(ptyxisPatch, /self->tab_view == NULL/);
+assert.match(ptyxisPatch, /self->terminal == NULL/);
+
+const snapPatch = readFileSync(
+  join(here, '../patches/gnome-software-snap-null-progress.patch'), 'utf8');
+assert.match(snapPatch, /if \(tasks == NULL\)/);
+assert.match(snapPatch, /GS_APP_PROGRESS_UNKNOWN/);
+
+const spPatch = readFileSync(
+  join(here, '../patches/software-properties-none-guards.patch'), 'utf8');
+assert.match(spPatch, /if source is None:/);
+assert.match(spPatch, /if candidate is None:/);
+
+const gdmPatch = readFileSync(
+  join(here, '../patches/gdm-session-conversation-teardown.patch'), 'utf8');
+assert.match(gdmPatch, /No active conversation/);
+assert.match(gdmPatch, /return self->session_opened/);
+
+const unPatch = readFileSync(
+  join(here, '../patches/update-notifier-null-hooks.patch'), 'utf8');
+assert.match(unPatch, /ret == NULL \|\| ret\[0\] == '\\0'/);
+assert.match(unPatch, /if \(cur == NULL\)/);
+
+const powerPatch = readFileSync(
+  join(here, '../patches/gsd-power-lid-null.patch'), 'utf8');
+assert.match(powerPatch, /if \(!display_config\)/);
+assert.match(powerPatch, /if \(!manager->screensaver_proxy\)/);
+
+const gcc2Patch = readFileSync(
+  join(here, '../patches/gnome-control-center-display-wacom-network.patch'), 'utf8');
+assert.match(gcc2Patch, /if \(error &&/);
+assert.match(gcc2Patch, /device_list->data == NULL/);
+
 console.log('search-providers.test.mjs: all assertions passed');

@@ -1,0 +1,105 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: snap: guard NULL task/app arrays and zero progress totals
+
+progress_cb divided by total with no zero/NULL-task check (SIGFPE
+or SEGV). get_primary_app and media refine walked NULL GPtrArrays.
+Markdown parse of a NULL description returned NULL nodes. Flatpak
+size refine passed a NULL runtime into state refine.
+
+Forwarded: no
+---
+--- a/plugins/snap/gs-plugin-snap.c	2026-03-13 07:31:09.000000000 +0000
++++ b/plugins/snap/gs-plugin-snap.c	2026-08-14 09:05:48.695849196 +0000
+@@ -1235,6 +1235,9 @@
+ 	 * The "main app" is one whose name matches the snap name.
+ 	 */
+ 	apps = snapd_snap_get_apps (snap);
++	if (apps == NULL)
++		return NULL;
++
+ 	for (i = 0; i < apps->len; i++) {
+ 		SnapdApp *app = apps->pdata[i];
+ 
+@@ -1255,6 +1258,9 @@
+ 	guint i;
+ 
+ 	media = snapd_snap_get_media (snap);
++	if (media == NULL)
++		return;
++
+ 	for (i = 0; i < media->len; i++) {
+ 		SnapdMedia *m = media->pdata[i];
+ 		g_autoptr(GIcon) icon = NULL;
+@@ -1370,7 +1376,8 @@
+ 	g_autoptr(GString) text = g_string_new ("");
+ 
+ 	nodes = snapd_markdown_parser_parse (parser, snapd_snap_get_description (snap));
+-	serialize_nodes (nodes, text, 0);
++	if (nodes != NULL)
++		serialize_nodes (nodes, text, 0);
+ 	return g_string_free (g_steal_pointer (&text), FALSE);
+ }
+ 
+@@ -1381,6 +1388,9 @@
+ 	guint i;
+ 
+ 	media = snapd_snap_get_media (snap);
++	if (media == NULL)
++		return;
++
+ 	for (i = 0; i < media->len; i++) {
+ 		SnapdMedia *m = media->pdata[i];
+ 		const gchar *url;
+@@ -1778,13 +1788,19 @@
+ 	gint64 done = 0, total = 0;
+ 
+ 	tasks = snapd_change_get_tasks (change);
++	if (tasks == NULL)
++		return;
++
+ 	for (i = 0; i < tasks->len; i++) {
+ 		SnapdTask *task = tasks->pdata[i];
+ 		done += snapd_task_get_progress_done (task);
+ 		total += snapd_task_get_progress_total (task);
+ 	}
+ 
+-	gs_app_set_progress (app, (guint) (100 * done / total));
++	if (total > 0)
++		gs_app_set_progress (app, (guint) (100 * done / total));
++	else
++		gs_app_set_progress (app, GS_APP_PROGRESS_UNKNOWN);
+ }
+ 
+ typedef struct {
+@@ -1973,6 +1989,9 @@
+ 	guint percentage;
+ 
+ 	tasks = snapd_change_get_tasks (change);
++	if (tasks == NULL)
++		return;
++
+ 	for (guint i = 0; i < tasks->len; i++) {
+ 		SnapdTask *snap_task = tasks->pdata[i];
+ 
+@@ -2406,6 +2425,9 @@
+ 	guint percentage;
+ 
+ 	tasks = snapd_change_get_tasks (change);
++	if (tasks == NULL)
++		return;
++
+ 	for (guint i = 0; i < tasks->len; i++) {
+ 		SnapdTask *snap_task = tasks->pdata[i];
+ 
+--- a/plugins/flatpak/gs-flatpak.c	2026-03-13 07:31:09.000000000 +0000
++++ b/plugins/flatpak/gs-flatpak.c	2026-08-14 09:05:48.487849095 +0000
+@@ -3048,6 +3048,8 @@
+ 
+ 		/* is the app_runtime already installed? */
+ 		app_runtime = gs_app_get_runtime (app);
++		if (app_runtime == NULL)
++			return TRUE;
+ 		if (!gs_flatpak_refine_app_state_internal (self,
+ 		                                           app_runtime,
+ 		                                           interactive,

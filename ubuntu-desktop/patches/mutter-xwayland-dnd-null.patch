@@ -1,0 +1,116 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: xwayland dnd: end grab before teardown and guard NULL dnd
+
+X11 display close freed the XWayland DnD manager while grab
+handlers could still run. End the grab first, and tolerate a missing
+dnd object or data source on enter/release/dest callbacks.
+
+Forwarded: no
+---
+--- a/src/wayland/meta-xwayland-dnd.c	2026-04-14 13:37:46.000000000 +0000
++++ b/src/wayland/meta-xwayland-dnd.c	2026-08-14 09:05:33.627842318 +0000
+@@ -265,6 +265,11 @@
+   mtk_x11_error_trap_push (x11_display->xdisplay);
+ 
+   data_source = compositor->seat->data_device.dnd_data_source;
++  if (!data_source)
++    {
++      mtk_x11_error_trap_pop (x11_display->xdisplay);
++      return;
++    }
+   xev.xclient.type = ClientMessage;
+   xev.xclient.message_type = xdnd_atoms[ATOM_DND_ENTER];
+   xev.xclient.format = 32;
+@@ -474,7 +479,14 @@
+   MetaXWaylandManager *manager = &compositor->xwayland_manager;
+   MetaWaylandDragGrab *drag_grab = compositor->seat->data_device.current_grab;
+   MetaXWaylandDnd *dnd = manager->dnd;
+-  MetaX11Display *x11_display = x11_display_from_dnd (dnd);
++  MetaX11Display *x11_display;
++
++  if (!dnd)
++    return;
++
++  x11_display = x11_display_from_dnd (dnd);
++  if (!x11_display)
++    return;
+ 
+   if (drag_grab)
+     {
+@@ -638,6 +650,9 @@
+   MetaXWaylandDnd *dnd = compositor->xwayland_manager.dnd;
+   MetaWindow *window = meta_wayland_surface_get_window (surface);
+ 
++  if (!dnd)
++    return;
++
+   dnd->dnd_dest = meta_window_x11_get_xwindow (window);
+   xdnd_send_enter (dnd, dnd->dnd_dest);
+ }
+@@ -650,6 +665,9 @@
+   MetaWaylandCompositor *compositor = meta_wayland_seat_get_compositor (seat);
+   MetaXWaylandDnd *dnd = compositor->xwayland_manager.dnd;
+ 
++  if (!dnd)
++    return;
++
+   xdnd_send_leave (dnd, dnd->dnd_dest);
+   dnd->dnd_dest = None;
+ }
+@@ -665,6 +683,9 @@
+   MetaWaylandCompositor *compositor = meta_wayland_seat_get_compositor (seat);
+   MetaXWaylandDnd *dnd = compositor->xwayland_manager.dnd;
+ 
++  if (!dnd)
++    return;
++
+   xdnd_send_position (dnd, dnd->dnd_dest, time_ms, (int) x, (int) y);
+ }
+ 
+@@ -677,6 +698,9 @@
+   MetaXWaylandDnd *dnd = compositor->xwayland_manager.dnd;
+   MetaDisplay *display = display_from_compositor (compositor);
+ 
++  if (!dnd)
++    return;
++
+   xdnd_send_drop (dnd, dnd->dnd_dest,
+                   meta_display_get_current_time_roundtrip (display));
+ }
+@@ -692,6 +716,9 @@
+   ClutterSprite *sprite;
+   graphene_point_t pos;
+ 
++  if (!dnd)
++    return;
++
+   sprite = meta_wayland_drag_grab_get_sprite (drag_grab);
+ 
+   clutter_seat_query_state (seat->clutter_seat, sprite, &pos, NULL);
+@@ -934,6 +961,11 @@
+     return CLUTTER_EVENT_STOP;
+ 
+   data_source = compositor->seat->data_device.dnd_data_source;
++  if (!data_source)
++    {
++      meta_xwayland_end_dnd_grab (&seat->data_device, FALSE);
++      return CLUTTER_EVENT_PROPAGATE;
++    }
+ 
+   if (__builtin_popcount (clutter_event_get_state (event) &
+                           (CLUTTER_BUTTON1_MASK |
+@@ -1251,9 +1283,13 @@
+                             MetaX11Display      *x11_display)
+ {
+   MetaXWaylandDnd *dnd = manager->dnd;
++  MetaWaylandCompositor *compositor = manager->compositor;
+ 
+   g_assert (dnd != NULL);
+ 
++  if (compositor->seat && compositor->seat->data_device.current_grab)
++    meta_xwayland_end_dnd_grab (&compositor->seat->data_device, FALSE);
++
+   destroy_dnd_windows (dnd, x11_display);
+ 
+   g_free (dnd);

@@ -49,18 +49,38 @@ patch -p1 < ../../patches/update-manager-null-xid.patch
 
 cd ../gnome-settings-daemon-50.0
 patch -p1 < ../../patches/gsd-logind-null-proxy.patch
+patch -p1 < ../../patches/gsd-power-lid-null.patch
 
 cd ../xdg-desktop-portal-gnome-50.0
 patch -p1 < ../../patches/xdg-desktop-portal-gnome-null-uaf.patch
 
 cd ../gnome-control-center-50.3
 patch -p1 < ../../patches/gnome-control-center-snap-portal-id.patch
+patch -p1 < ../../patches/gnome-control-center-display-wacom-network.patch
 
 cd ../gnome-initial-setup-50.0
 patch -p1 < ../../patches/gnome-initial-setup-clear-cancellable.patch
 
 cd ../orca-50.2
 patch -p1 < ../../patches/orca-any-data-none.patch
+
+cd ../mutter-50.1
+patch -p1 < ../../patches/mutter-xwayland-dnd-null.patch
+
+cd ../ptyxis-50.1
+patch -p1 < ../../patches/ptyxis-close-null-terminal.patch
+
+cd ../gnome-software-50.0
+patch -p1 < ../../patches/gnome-software-snap-null-progress.patch
+
+cd ../software-properties-0.120.1
+patch -p1 < ../../patches/software-properties-none-guards.patch
+
+cd ../gdm3-50.1
+patch -p1 < ../../patches/gdm-session-conversation-teardown.patch
+
+cd ../update-notifier-3.207.2
+patch -p1 < ../../patches/update-notifier-null-hooks.patch
 ```
 
 ## Tests

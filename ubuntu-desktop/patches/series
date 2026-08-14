@@ -15,3 +15,11 @@ gnome-control-center-snap-portal-id.patch
 dash-to-dock-intellihide-null-actor.patch
 gnome-initial-setup-clear-cancellable.patch
 orca-any-data-none.patch
+mutter-xwayland-dnd-null.patch
+ptyxis-close-null-terminal.patch
+gnome-software-snap-null-progress.patch
+software-properties-none-guards.patch
+gdm-session-conversation-teardown.patch
+update-notifier-null-hooks.patch
+gsd-power-lid-null.patch
+gnome-control-center-display-wacom-network.patch

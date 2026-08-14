@@ -1,0 +1,75 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: SoftwareProperties: do not dereference missing sources or candidates
+
+ToggleSourceUse and EnableChildSource crashed when the string did
+not resolve. Driver apply used candidate.ver_str / depends_list_str
+when get_candidate_ver returned None. The Qt mirror dialog assumed
+currentItem() was set.
+
+Forwarded: no
+---
+--- a/softwareproperties/SoftwareProperties.py	2026-04-24 10:20:18.000000000 +0000
++++ b/softwareproperties/SoftwareProperties.py	2026-08-14 09:05:49.227849458 +0000
+@@ -381,6 +381,8 @@
+     """Enable a child repo of the distribution main repository"""
+     if isinstance(template, str):
+       template = self._find_template_from_string(template)
++    if template is None:
++      return
+ 
+     # Use the currently selected mirror only if the child source
+     # did not override the server
+@@ -458,6 +460,8 @@
+     #FIXME cdroms need to disable the comps in the childs and sources
+     if isinstance(source, str):
+       source = self._find_source_from_string(source)
++    if source is None:
++      return
+     source.disabled = not source.disabled
+     self.set_modified_sourceslist()
+ 
+@@ -860,6 +864,8 @@
+     else:
+         depcache = apt_pkg.DepCache(apt_cache)
+         candidate = depcache.get_candidate_ver(pkg)
++        if candidate is None:
++            return "%s;;;" % pkg.name
+         ver = candidate.ver_str
+         arch = candidate.arch
+     return "%s;%s;%s;" % (pkg.name, ver, arch)
+@@ -869,6 +875,8 @@
+     """ Get the package dependencies, which can be filtered out by a pattern """
+     depcache = apt_pkg.DepCache(apt_cache)
+     candidate = depcache.get_candidate_ver(package)
++    if candidate is None:
++        return []
+ 
+     dependencies = []
+     try:
+--- a/softwareproperties/qt/DialogMirror.py	2026-04-24 10:20:18.000000000 +0000
++++ b/softwareproperties/qt/DialogMirror.py	2026-08-14 09:06:01.299855713 +0000
+@@ -107,7 +107,10 @@
+     """ Check if the currently selected row in the mirror list
+         contains a mirror and or is editable """
+     # Update the list of available protocolls
+-    hostname = self.treeview.currentItem().text(0)
++    item = self.treeview.currentItem()
++    if item is None:
++        return
++    hostname = item.text(0)
+     mirror = self.mirror_map[hostname]
+     self.combobox.clear()
+     if mirror != None:
+@@ -139,7 +142,10 @@
+ 
+     # FIXME: we should also return the list of custom servers
+     if res == QDialog.DialogCode.Accepted:
+-        hostname = self.treeview.currentItem().text(0)
++        item = self.treeview.currentItem()
++        if item is None:
++            return None
++        hostname = item.text(0)
+         mirror = self.mirror_map[hostname]
+ 
+         if mirror == None:

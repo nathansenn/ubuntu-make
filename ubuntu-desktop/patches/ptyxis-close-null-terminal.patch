@@ -1,0 +1,79 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: window/tab: tolerate a missing window or terminal on close
+
+The async close-tab dialog looked up the ancestor window after
+teardown. Polling the agent, saving size, grabbing focus, and
+notify destroy all used self->terminal without a NULL check.
+
+Forwarded: no
+---
+--- a/src/ptyxis-window.c	2026-08-14 09:06:36.000000000 +0000
++++ b/src/ptyxis-window.c	2026-08-14 09:05:34.099842517 +0000
+@@ -118,7 +118,12 @@
+     {
+       PtyxisSettings *settings = ptyxis_application_get_settings (PTYXIS_APPLICATION_DEFAULT);
+       PtyxisTerminal *terminal = ptyxis_tab_get_terminal (active_tab);
+-      guint columns = vte_terminal_get_column_count (VTE_TERMINAL (terminal));
++      guint columns;
++
++      if (terminal == NULL)
++        return;
++
++      columns = vte_terminal_get_column_count (VTE_TERMINAL (terminal));
+       guint rows = vte_terminal_get_row_count (VTE_TERMINAL (terminal));
+ 
+       ptyxis_settings_set_window_size (settings, columns, rows);
+@@ -139,7 +144,12 @@
+   g_assert (PTYXIS_IS_TAB (tab));
+ 
+   self = PTYXIS_WINDOW (gtk_widget_get_ancestor (GTK_WIDGET (tab), PTYXIS_TYPE_WINDOW));
++  if (self == NULL || self->tab_view == NULL)
++    return;
++
+   page = adw_tab_view_get_page (self->tab_view, GTK_WIDGET (tab));
++  if (page == NULL)
++    return;
+ 
+   if (!_ptyxis_close_dialog_run_finish (result, &error))
+     {
+--- a/src/ptyxis-tab.c	2026-03-17 00:25:49.000000000 +0000
++++ b/src/ptyxis-tab.c	2026-08-14 09:05:40.319845246 +0000
+@@ -2097,7 +2097,7 @@
+   task = g_task_new (self, cancellable, callback, user_data);
+   g_task_set_source_tag (task, ptyxis_tab_poll_agent_async);
+ 
+-  if (self->process == NULL)
++  if (self->process == NULL || self->terminal == NULL)
+     {
+       self->has_foreground_process = FALSE;
+       self->pid = -1;
+@@ -2546,5 +2546,6 @@
+ {
+   g_return_if_fail (PTYXIS_IS_TAB (self));
+ 
+-  gtk_widget_grab_focus (GTK_WIDGET (self->terminal));
++  if (self->terminal != NULL)
++    gtk_widget_grab_focus (GTK_WIDGET (self->terminal));
+ }
+--- a/src/ptyxis-tab-notify.h	2026-03-17 00:25:49.000000000 +0000
++++ b/src/ptyxis-tab-notify.h	2026-08-14 09:05:33.627842318 +0000
+@@ -205,8 +205,16 @@
+   g_clear_handle_id (&notify->contents_changed_source, g_source_remove);
+   g_clear_handle_id (&notify->shell_preexec_source, g_source_remove);
+ 
+-  g_clear_signal_handler (&notify->shell_precmd_handler, terminal);
+-  g_clear_signal_handler (&notify->shell_preexec_handler, terminal);
++  if (terminal != NULL)
++    {
++      g_clear_signal_handler (&notify->shell_precmd_handler, terminal);
++      g_clear_signal_handler (&notify->shell_preexec_handler, terminal);
++    }
++  else
++    {
++      notify->shell_precmd_handler = 0;
++      notify->shell_preexec_handler = 0;
++    }
+ 
+   g_clear_pointer (&notify->current_cmdline, g_free);
+ 

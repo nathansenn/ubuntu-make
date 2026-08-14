@@ -1,0 +1,93 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: display/wacom/network: guard NULL GError, devices, and NM settings
+
+Display panel init logged error->message when the finish function
+left error NULL. Wacom mock-stylus idle and display combo used empty
+or stale models. QR/Wi-Fi rows assumed connection settings exist.
+
+Forwarded: no
+---
+--- a/panels/display/cc-display-panel.c	2026-08-14 09:06:39.000000000 +0000
++++ b/panels/display/cc-display-panel.c	2026-08-14 09:06:20.283866765 +0000
+@@ -1038,7 +1038,8 @@
+   proxy = cc_object_storage_create_dbus_proxy_finish (res, &error);
+   if (!proxy)
+     {
+-      if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++      if (error &&
++          !g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+         g_warning ("Failed to contact gnome-shell: %s", error->message);
+       return;
+     }
+@@ -1059,7 +1060,8 @@
+   bus = g_bus_get_finish (res, &error);
+   if (!bus)
+     {
+-      if (!g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++      if (error &&
++          !g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+         {
+           g_warning ("Failed to get session bus: %s", error->message);
+         }
+--- a/panels/wacom/cc-wacom-panel.c	2026-06-24 09:00:08.000000000 +0000
++++ b/panels/wacom/cc-wacom-panel.c	2026-08-14 09:06:19.975866574 +0000
+@@ -509,7 +509,7 @@
+ 	self->mock_stylus_id = 0;
+ 
+ 	device_list = g_hash_table_get_values (self->devices);
+-	if (device_list == NULL) {
++	if (device_list == NULL || device_list->data == NULL) {
+ 		g_warning ("Could not create fake stylus event because could not find tablet device");
+ 		return G_SOURCE_REMOVE;
+ 	}
+--- a/panels/wacom/cc-wacom-page.c	2026-06-24 09:00:08.000000000 +0000
++++ b/panels/wacom/cc-wacom-page.c	2026-08-14 09:06:20.015866599 +0000
+@@ -477,7 +477,12 @@
+ 
+ 	list = adw_combo_row_get_model (ADW_COMBO_ROW (page->tablet_display));
+ 	idx = adw_combo_row_get_selected (ADW_COMBO_ROW (page->tablet_display));
++	if (!list || idx < 0 || (guint) idx >= g_list_model_get_n_items (list))
++		return;
++
+ 	obj = g_list_model_get_item (list, idx);
++	if (!obj)
++		return;
+ 
+ 	variant = g_object_get_data (obj, "value-output");
+ 
+--- a/panels/network/cc-qr-code.c	2026-06-24 09:00:08.000000000 +0000
++++ b/panels/network/cc-qr-code.c	2026-08-14 09:06:20.279866763 +0000
+@@ -253,6 +253,9 @@
+   g_return_val_if_fail (c, TRUE);
+ 
+   s_con = nm_connection_get_setting_connection (c);
++  if (!s_con)
++    return FALSE;
++
+   timestamp = nm_setting_connection_get_timestamp (s_con);
+ 
+   /* Check timestamp to determine if connection was successful in the past */
+@@ -321,6 +324,8 @@
+   gboolean hidden;
+ 
+   setting = nm_connection_get_setting_wireless (c);
++  if (!setting)
++    return NULL;
+   ssid = nm_setting_wireless_get_ssid (setting);
+ 
+   if (!ssid)
+--- a/panels/network/cc-wifi-connection-row.c	2026-06-24 09:00:08.000000000 +0000
++++ b/panels/network/cc-wifi-connection-row.c	2026-08-14 09:06:19.995866586 +0000
+@@ -199,6 +199,11 @@
+       const gchar *ssid_pos;
+ 
+       sw = nm_connection_get_setting_wireless (self->connection);
++      if (!sw) {
++        adw_preferences_row_set_title (ADW_PREFERENCES_ROW (self),
++                                       nm_connection_get_id (NM_CONNECTION (self->connection)));
++        return;
++      }
+ 
+       ssid = nm_setting_wireless_get_ssid (sw);
+       ssid_str = nm_utils_ssid_to_utf8 (g_bytes_get_data (ssid, NULL), g_bytes_get_size (ssid));

@@ -1,0 +1,150 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: session: complete pending D-Bus calls when a conversation dies
+
+Logout/reset freed conversations without completing
+BeginVerification or worker queries, hanging the greeter. SessionExited
+cleared session_conversation even for a newer conversation. get_session_id
+ignored the still-valid session_opened id during teardown.
+
+Forwarded: no
+---
+--- a/daemon/gdm-session.c	2026-08-14 09:06:37.000000000 +0000
++++ b/daemon/gdm-session.c	2026-08-14 09:06:11.183861287 +0000
+@@ -798,15 +798,20 @@
+         }
+ 
+         conversation = find_conversation_by_name (self, service_name);
+-        if (conversation != NULL) {
+-                set_pending_query (conversation, invocation);
+-
+-                g_debug ("GdmSession: emitting choice query '%s'", prompt_message);
+-                gdm_dbus_user_verifier_choice_list_emit_choice_query (choice_list_interface,
+-                                                                      service_name,
+-                                                                      prompt_message,
+-                                                                      query);
++        if (conversation == NULL) {
++                g_dbus_method_invocation_return_error_literal (invocation,
++                                                               G_DBUS_ERROR,
++                                                               G_DBUS_ERROR_ACCESS_DENIED,
++                                                               "No active conversation");
++                return TRUE;
+         }
++        set_pending_query (conversation, invocation);
++
++        g_debug ("GdmSession: emitting choice query '%s'", prompt_message);
++        gdm_dbus_user_verifier_choice_list_emit_choice_query (choice_list_interface,
++                                                              service_name,
++                                                              prompt_message,
++                                                              query);
+ 
+         return TRUE;
+ }
+@@ -873,13 +878,18 @@
+         g_return_val_if_fail (self->user_verifier_interface != NULL, FALSE);
+ 
+         conversation = find_conversation_by_name (self, service_name);
+-        if (conversation != NULL) {
+-                set_pending_query (conversation, invocation);
+-
+-                gdm_dbus_user_verifier_emit_info_query (self->user_verifier_interface,
+-                                                        service_name,
+-                                                        query);
++        if (conversation == NULL) {
++                g_dbus_method_invocation_return_error_literal (invocation,
++                                                               G_DBUS_ERROR,
++                                                               G_DBUS_ERROR_ACCESS_DENIED,
++                                                               "No active conversation");
++                return TRUE;
+         }
++        set_pending_query (conversation, invocation);
++
++        gdm_dbus_user_verifier_emit_info_query (self->user_verifier_interface,
++                                                service_name,
++                                                query);
+ 
+         return TRUE;
+ }
+@@ -896,13 +906,18 @@
+         g_return_val_if_fail (self->user_verifier_interface != NULL, FALSE);
+ 
+         conversation = find_conversation_by_name (self, service_name);
+-        if (conversation != NULL) {
+-                set_pending_query (conversation, invocation);
+-
+-                gdm_dbus_user_verifier_emit_secret_info_query (self->user_verifier_interface,
+-                                                               service_name,
+-                                                               query);
++        if (conversation == NULL) {
++                g_dbus_method_invocation_return_error_literal (invocation,
++                                                               G_DBUS_ERROR,
++                                                               G_DBUS_ERROR_ACCESS_DENIED,
++                                                               "No active conversation");
++                return TRUE;
+         }
++        set_pending_query (conversation, invocation);
++
++        gdm_dbus_user_verifier_emit_secret_info_query (self->user_verifier_interface,
++                                                       service_name,
++                                                       query);
+ 
+         return TRUE;
+ }
+@@ -1031,7 +1046,8 @@
+ {
+         GdmSession *self = conversation->session;
+ 
+-        self->session_conversation = NULL;
++        if (self->session_conversation == conversation)
++                self->session_conversation = NULL;
+ 
+         if (WIFEXITED (status)) {
+                 g_debug ("GdmSession: Emitting 'session-exited' signal with exit code '%d'",
+@@ -2099,6 +2115,15 @@
+ static void
+ free_conversation (GdmSessionConversation *conversation)
+ {
++        cancel_pending_query (conversation);
++
++        if (conversation->starting_invocation != NULL) {
++                g_dbus_method_invocation_return_dbus_error (conversation->starting_invocation,
++                                                            GDM_SESSION_DBUS_ERROR_CANCEL,
++                                                            "Operation cancelled");
++                g_clear_object (&conversation->starting_invocation);
++        }
++
+         close_conversation (conversation);
+ 
+         if (conversation->job != NULL) {
+@@ -2509,8 +2534,15 @@
+         ret = g_dbus_proxy_call_finish (G_DBUS_PROXY (proxy), res, &error);
+ 
+         if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CLOSED) ||
+-            g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++            g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
++                if (conversation->starting_invocation != NULL) {
++                        g_dbus_method_invocation_return_dbus_error (conversation->starting_invocation,
++                                                                    GDM_SESSION_DBUS_ERROR_CANCEL,
++                                                                    "Operation cancelled");
++                        g_clear_object (&conversation->starting_invocation);
++                }
+                 return;
++        }
+ 
+         self = conversation->session;
+         service_name = conversation->service_name;
+@@ -3320,11 +3352,10 @@
+ 
+         conversation = self->session_conversation;
+ 
+-        if (conversation == NULL) {
+-                return NULL;
+-        }
++        if (conversation != NULL)
++                return conversation->session_id;
+ 
+-        return conversation->session_id;
++        return self->session_opened;
+ }
+ 
+ const char *
