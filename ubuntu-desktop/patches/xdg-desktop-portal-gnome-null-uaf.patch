@@ -1,0 +1,76 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: screencast: steal window refs; tolerate missing GAppInfo
+
+find_best_window_by_app_id_and_title() returned a g_autoptr window
+and stored another as best_match, both use-after-free. App chooser
+rows and the account dialog called GAppInfo getters when
+g_desktop_app_info_new() returned NULL (snap IDs).
+
+Forwarded: no
+---
+--- a/src/screencast.c	2026-03-14 16:17:01.000000000 +0000
++++ b/src/screencast.c	2026-08-14 09:01:31.695790303 +0000
+@@ -450,10 +450,9 @@
+ {
+   ShellIntrospect *shell_introspect = shell_introspect_get ();
+   GListModel *windows;
+-  ShellWindow *best_match;
++  g_autoptr(ShellWindow) best_match = NULL;
+   glong best_match_distance;
+ 
+-  best_match = NULL;
+   best_match_distance = G_MAXLONG;
+ 
+   shell_introspect_ref_listeners (shell_introspect);
+@@ -471,11 +470,11 @@
+       distance = str_distance (shell_window_get_title (window), title);
+ 
+       if (distance == 0)
+-        return window;
++        return g_steal_pointer (&window);
+ 
+       if (distance < best_match_distance)
+         {
+-          best_match = window;
++          g_set_object (&best_match, window);
+           best_match_distance = distance;
+         }
+     }
+@@ -488,7 +487,7 @@
+   if (best_match_distance > strlen (title) / 2)
+     return NULL;
+ 
+-  return best_match;
++  return g_steal_pointer (&best_match);
+ }
+ 
+ void
+--- a/src/appchooserrow.c	2026-03-14 16:17:01.000000000 +0000
++++ b/src/appchooserrow.c	2026-08-14 09:01:31.691790309 +0000
+@@ -78,6 +78,14 @@
+ 
+   g_set_object (&row->info, info);
+ 
++  if (info == NULL)
++    {
++      gtk_image_set_from_icon_name (GTK_IMAGE (row->icon), "application-x-executable");
++      gtk_image_set_pixel_size (GTK_IMAGE (row->icon), 32);
++      gtk_label_set_label (GTK_LABEL (row->name), "");
++      return row;
++    }
++
+   icon = g_app_info_get_icon (info);
+   if (!icon)
+     icon = g_themed_icon_new ("application-x-executable");
+--- a/src/accountdialog.c	2026-03-14 16:17:01.000000000 +0000
++++ b/src/accountdialog.c	2026-08-14 09:01:31.707790286 +0000
+@@ -231,7 +231,7 @@
+       id = g_strconcat (app_id, ".desktop", NULL);
+       info = G_APP_INFO (g_desktop_app_info_new (id));
+       heading = g_strdup_printf (_("Share your personal information with %1$s? %2$s"),
+-                                 g_app_info_get_display_name (info),
++                                 info ? g_app_info_get_display_name (info) : app_id,
+                                  reason ?: "");
+     }
+   else

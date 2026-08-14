@@ -1,0 +1,52 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: media-keys: do not Inhibit on a NULL logind proxy
+
+If g_dbus_proxy_new_sync() fails, the manager logged the error and
+then called g_dbus_proxy_call_with_unix_fd_list() on the NULL proxy.
+Lock-screen finish also dereferenced a NULL GError. xsettings treated
+a missing ActUser as loaded.
+
+Forwarded: no
+---
+--- a/plugins/media-keys/gsd-media-keys-manager.c	2026-08-14 09:02:34.000000000 +0000
++++ b/plugins/media-keys/gsd-media-keys-manager.c	2026-08-14 09:01:16.231814196 +0000
+@@ -1376,10 +1376,12 @@
+         is_locked = gsd_screen_saver_call_lock_finish (screen_saver, result, &error);
+ 
+         if (!is_locked) {
+-                g_warning ("Couldn't lock screen: %s", error->message);
+-                g_error_free (error);
++                g_warning ("Couldn't lock screen: %s",
++                           error ? error->message : "unknown error");
++                g_clear_error (&error);
+                 return;
+         }
++        g_clear_error (&error);
+ }
+ 
+ static void
+@@ -3441,8 +3443,10 @@
+ 
+         if (priv->logind_proxy == NULL) {
+                 g_warning ("Failed to connect to systemd: %s",
+-                           error->message);
+-                g_error_free (error);
++                           error ? error->message : "unknown error");
++                g_clear_error (&error);
++                g_object_unref (bus);
++                return;
+         }
+ 
+         g_object_unref (bus);
+--- a/plugins/xsettings/gsd-xsettings-manager.c	2026-08-14 09:02:34.000000000 +0000
++++ b/plugins/xsettings/gsd-xsettings-manager.c	2026-08-14 09:01:31.731790254 +0000
+@@ -1325,6 +1325,8 @@
+                 g_signal_handlers_disconnect_by_data (manager, user_data);
+ 
+                 user = act_user_manager_get_user (manager, g_get_user_name ());
++                if (user == NULL)
++                        return;
+ 
+                 if (act_user_is_loaded (user))
+                         user_notify_is_loaded_cb (G_OBJECT (user), NULL, user_data);

@@ -1,0 +1,106 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: sidebar: guard NULL row, slot, bookmark location, wallpaper error
+
+Activation used the selected row (which can be NULL) instead of the
+activated row. Alt+Down unmount had the same gap. Bookmark reorder
+called nautilus_file_get_location() when the target file was gone.
+Opening a place with no window_slot dereferenced NULL. Wallpaper
+portal failure logged error->message when error was NULL.
+
+Forwarded: no
+---
+--- a/src/nautilus-sidebar.c	2026-05-25 17:09:25.000000000 +0000
++++ b/src/nautilus-sidebar.c	2026-08-14 09:01:44.219775288 +0000
+@@ -259,6 +259,10 @@
+     {
+         if (!preferred_slot)
+         {
++            if (self->window_slot == NULL)
++            {
++                return;
++            }
+             nautilus_window_slot_open_location_full (self->window_slot, location, NULL);
+         }
+         else
+@@ -1483,12 +1487,15 @@
+                    NautilusSidebarRow *row,
+                    int                 new_position)
+ {
+-    g_autoptr (NautilusFile) file = NULL;
+-
+-    g_object_get (row, "file", &file, NULL);
++    g_autofree char *uri = NULL;
+ 
+-    g_autoptr (GFile) location = nautilus_file_get_location (file);
++    g_object_get (row, "uri", &uri, NULL);
++    if (uri == NULL)
++    {
++        return;
++    }
+ 
++    g_autoptr (GFile) location = g_file_new_for_uri (uri);
+     nautilus_bookmark_list_move_item (sidebar->bookmark_list, location, new_position);
+ }
+ 
+@@ -2534,6 +2541,10 @@
+     GtkListBoxRow *row;
+ 
+     row = gtk_list_box_get_selected_row (GTK_LIST_BOX (sidebar->list_box));
++    if (row == NULL)
++    {
++        return FALSE;
++    }
+     ret = eject_or_unmount_bookmark (NAUTILUS_SIDEBAR_ROW (row));
+ 
+     return ret;
+@@ -3171,8 +3182,6 @@
+                   GtkListBoxRow *row,
+                   gpointer       user_data)
+ {
+-    NautilusSidebarRow *selected_row;
+-
+     /* Avoid to open a location if the user is dragging. Changing the location
+      * while dragging usually makes clients changing the view of the files, which
+      * is confusing while the user has the attention on the drag
+@@ -3182,8 +3191,14 @@
+         return;
+     }
+ 
+-    selected_row = NAUTILUS_SIDEBAR_ROW (gtk_list_box_get_selected_row (list_box));
+-    open_row (selected_row, 0);
++    (void) list_box;
++
++    if (row == NULL)
++    {
++        return;
++    }
++
++    open_row (NAUTILUS_SIDEBAR_ROW (row), 0);
+ }
+ 
+ static void
+--- a/src/nautilus-bookmark.c	2026-05-25 17:09:25.000000000 +0000
++++ b/src/nautilus-bookmark.c	2026-08-14 09:01:14.851816638 +0000
+@@ -629,6 +629,9 @@
+ char *
+ nautilus_bookmark_get_uri (NautilusBookmark *bookmark)
+ {
++    g_return_val_if_fail (NAUTILUS_IS_BOOKMARK (bookmark), NULL);
++    g_return_val_if_fail (bookmark->location != NULL, NULL);
++
+     return g_file_get_uri (bookmark->location);
+ }
+ 
+--- a/src/nautilus-files-view.c	2026-08-14 09:02:57.919747786 +0000
++++ b/src/nautilus-files-view.c	2026-08-14 09:01:14.995816379 +0000
+@@ -6496,7 +6496,8 @@
+     if (!xdp_portal_set_wallpaper_finish (portal, result, &error)
+         && !g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+     {
+-        g_warning ("Failed to set wallpaper via portal: %s", error->message);
++        g_warning ("Failed to set wallpaper via portal: %s",
++                   error != NULL ? error->message : "unknown error");
+     }
+ }
+ 

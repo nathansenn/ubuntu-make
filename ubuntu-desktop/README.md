@@ -33,16 +33,34 @@ patch -p1 < ../../patches/gnome-shell-ubuntu-extensions-search-providers.patch
 cd ../gnome-shell-50.1
 patch -p1 < ../../patches/gnome-shell-unguarded-splice.patch
 patch -p1 < ../../patches/gnome-shell-disposed-last-device.patch
+patch -p1 < ../../patches/gnome-shell-search-unlock-mpris.patch
 
 cd ../nautilus-50.2.2
 patch -p1 < ../../patches/nautilus-xdg-terminal-exec-leak.patch
+patch -p1 < ../../patches/nautilus-sidebar-null-guards.patch
 
 cd ../gnome-shell-ubuntu-extensions-50.26.04.7ubuntu
 patch -p1 < ../../patches/desktop-icons-ng-clearwindow-idempotent.patch
 patch -p1 < ../../patches/snapd-prompting-teardown.patch
+patch -p1 < ../../patches/dash-to-dock-intellihide-null-actor.patch
 
 cd ../update-manager-26.04.5
 patch -p1 < ../../patches/update-manager-null-xid.patch
+
+cd ../gnome-settings-daemon-50.0
+patch -p1 < ../../patches/gsd-logind-null-proxy.patch
+
+cd ../xdg-desktop-portal-gnome-50.0
+patch -p1 < ../../patches/xdg-desktop-portal-gnome-null-uaf.patch
+
+cd ../gnome-control-center-50.3
+patch -p1 < ../../patches/gnome-control-center-snap-portal-id.patch
+
+cd ../gnome-initial-setup-50.0
+patch -p1 < ../../patches/gnome-initial-setup-clear-cancellable.patch
+
+cd ../orca-50.2
+patch -p1 < ../../patches/orca-any-data-none.patch
 ```
 
 ## Tests

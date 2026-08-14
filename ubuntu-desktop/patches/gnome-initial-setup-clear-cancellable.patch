@@ -1,0 +1,20 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: summary: unref the GCancellable instead of g_free
+
+g_clear_pointer(..., g_free) freed a GCancellable without dropping
+the GObject ref. Use g_clear_object().
+
+Forwarded: no
+---
+--- a/gnome-initial-setup/pages/summary/gis-summary-page.c	2026-08-14 09:02:36.000000000 +0000
++++ b/gnome-initial-setup/pages/summary/gis-summary-page.c	2026-08-14 09:01:44.167775342 +0000
+@@ -475,7 +475,7 @@
+ 
+     g_cancellable_cancel (priv->cancellable);
+ 
+-    g_clear_pointer (&priv->cancellable, g_free);
++    g_clear_object (&priv->cancellable);
+     priv->cancellable = g_cancellable_new ();
+ 
+     g_autoptr (GTask) task = g_task_new (page, priv->cancellable,

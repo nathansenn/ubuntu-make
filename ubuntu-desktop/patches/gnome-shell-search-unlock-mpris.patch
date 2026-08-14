@@ -1,0 +1,58 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: search: skip disposed provider; unlock/mpris tolerate missing player UI
+
+_doProviderSearch finally called _updateResults after the provider
+was unregistered (disposed display). unlockDialog destroyed a missing
+MediaMessage. mpris emitted player-removed when canPlay flipped false
+without a prior player-added.
+
+Forwarded: no
+---
+--- a/js/ui/search.js	2026-08-14 09:02:34.000000000 +0000
++++ b/js/ui/search.js	2026-08-14 09:01:31.671790335 +0000
+@@ -736,7 +736,8 @@
+             }
+         } finally {
+             this._results[provider.id] = results;
+-            await this._updateResults(provider, terms, results);
++            if (this._providers.includes(provider))
++                await this._updateResults(provider, terms, results);
+         }
+     }
+ 
+--- a/js/ui/unlockDialog.js	2026-08-14 09:02:34.000000000 +0000
++++ b/js/ui/unlockDialog.js	2026-08-14 09:01:31.671790335 +0000
+@@ -230,7 +230,7 @@
+     _removePlayer(player) {
+         const message = this._players.get(player);
+         this._players.delete(player);
+-        message.destroy();
++        message?.destroy();
+         this._updateVisibility();
+     }
+ 
+--- a/js/ui/mpris.js	2026-08-14 09:02:34.000000000 +0000
++++ b/js/ui/mpris.js	2026-08-14 09:01:31.691790309 +0000
+@@ -214,12 +214,18 @@
+         const player = new MprisPlayer(busName);
+         this._players.set(busName, player);
+ 
++        let added = false;
+         player.connectObject('notify::can-play',
+             () => {
+-                if (player.canPlay)
+-                    this.emit('player-added', player);
+-                else
++                if (player.canPlay) {
++                    if (!added) {
++                        added = true;
++                        this.emit('player-added', player);
++                    }
++                } else if (added) {
++                    added = false;
+                     this.emit('player-removed', player);
++                }
+             }, this);
+     }
+ 

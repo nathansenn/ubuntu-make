@@ -152,6 +152,63 @@ missing.
 - `mutter` 50.1-0ubuntu2.2: Wayland popup `wl_resource_get_client` crash
   (LP #2127757, fixed upstream in 49.2 and present here).
 
+## Fixed here (`patches/nautilus-sidebar-null-guards.patch`)
+
+Places sidebar activation opened `gtk_list_box_get_selected_row()` instead
+of the activated row, so keyboard/touch activation with no selection called
+`g_object_get()` on NULL. Alt+Down unmount had the same gap. Bookmark
+reorder used `nautilus_file_get_location()` when the target was gone
+(unmounted), then `g_file_get_uri(NULL)`. Opening a place before a
+`window_slot` was set dereferenced the slot. Wallpaper portal failure
+logged `error->message` when finish returned FALSE with a NULL error.
+
+## Fixed here (`patches/gsd-logind-null-proxy.patch`)
+
+Media-keys logged a failed logind proxy and then called
+`g_dbus_proxy_call_with_unix_fd_list()` on it (guaranteed SEGV when
+systemd is missing). Lock-screen finish used `error->message` when
+`error` was NULL. xsettings called `act_user_is_loaded()` on a NULL
+`ActUser`.
+
+## Fixed here (`patches/xdg-desktop-portal-gnome-null-uaf.patch`)
+
+Screencast restore returned a `g_autoptr(ShellWindow)` and stored another
+as `best_match` without taking a ref — use-after-free when restoring a
+window session. App chooser rows and the account dialog called
+`g_app_info_get_*` when `g_desktop_app_info_new()` returned NULL (snap
+desktop IDs).
+
+## Fixed here (`patches/gnome-shell-search-unlock-mpris.patch`)
+
+`_doProviderSearch` ran `_updateResults` in `finally` after the provider
+was unregistered (disposed display). unlockDialog `_removePlayer` called
+`message.destroy()` when MPRIS emitted `player-removed` for a player that
+never got a lock-screen UI. mpris `notify::can-play` emitted
+`player-removed` on the first false transition.
+
+## Fixed here (`patches/gnome-control-center-snap-portal-id.patch`)
+
+`cc_util_app_get_portal_id()` built `snap.<name><app>` instead of
+`snap.<name>_<app>`. The applications panel already splits on `_`.
+Desktop sharing still used `error->message` on `secret_service_get_*`
+failure (collection-for-alias was already guarded).
+
+## Fixed here (`patches/dash-to-dock-intellihide-null-actor.patch`)
+
+`window-created` can fire before `get_compositor_private()` returns an
+actor. Intellihide connected signals on NULL and crashed the dock.
+
+## Fixed here (`patches/gnome-initial-setup-clear-cancellable.patch`)
+
+Summary page used `g_clear_pointer(&cancellable, g_free)` on a
+`GCancellable` (should be `g_clear_object`).
+
+## Fixed here (`patches/orca-any-data-none.patch`)
+
+AT-SPI text events can have `any_data=None`. Typing echo, live regions,
+chat, terminal utilities, and event-reason helpers called `.lower()` /
+`.strip()` / `"in"` on it and took Orca down.
+
 ## Looked at, not changed
 
 - Dash-to-dock lock-screen watchdog and a11y focus: already updated in
@@ -160,8 +217,8 @@ missing.
   (LP #2147581).
 - AppIndicator lock-screen name-own race: documented FIXME, watchdog already
   present; no new evidence it is still broken.
-- Nautilus / mutter / gsd: no additional unfixed crashers identified in this
-  pass that are clearly ours to patch without a reproducer.
+- Remaining mutter Wayland leftover-resource / NULL actor paths and
+  gnome-software snap `progress_cb` SIGFPE are still open.
 
 ## Seed coverage
 

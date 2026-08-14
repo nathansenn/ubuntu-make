@@ -1,0 +1,23 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: intellihide: skip window-created until compositor actor exists
+
+window-created can fire before get_compositor_private() returns an
+actor. Connecting signals on NULL crashed the dock.
+
+Forwarded: no
+---
+--- a/subprojects/dash-to-dock/intellihide.js	2026-04-16 07:17:17.000000000 +0000
++++ b/subprojects/dash-to-dock/intellihide.js	2026-08-14 09:01:44.159775351 +0000
+@@ -128,7 +128,10 @@
+     }
+ 
+     _windowCreated(display, metaWindow) {
+-        this._addWindowSignals(metaWindow.get_compositor_private());
++        const actor = metaWindow.get_compositor_private();
++        if (!actor)
++            return;
++        this._addWindowSignals(actor);
+         this._doCheckOverlap();
+     }
+ 

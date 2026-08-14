@@ -230,4 +230,131 @@ const kbdPatch = readFileSync(
 assert.match(kbdPatch, /device-removed/);
 assert.match(kbdPatch, /already disposed/);
 
+{
+  function openActivated(row, selected) {
+    const target = row ?? selected;
+    if (!target)
+      return 'skipped';
+    return target;
+  }
+  assert.equal(openActivated(null, null), 'skipped');
+  assert.equal(openActivated('activated', null), 'activated');
+  assert.equal(openActivated(null, 'selected'), 'selected');
+}
+
+const sidebarPatch = readFileSync(
+  join(here, '../patches/nautilus-sidebar-null-guards.patch'), 'utf8');
+assert.match(sidebarPatch, /open_row \(NAUTILUS_SIDEBAR_ROW \(row\), 0\)/);
+assert.match(sidebarPatch, /if \(row == NULL\)/);
+assert.match(sidebarPatch, /g_file_new_for_uri \(uri\)/);
+assert.match(sidebarPatch, /self->window_slot == NULL/);
+
+{
+  function inhibit(logindProxy) {
+    if (!logindProxy)
+      return 'skipped';
+    return 'inhibit';
+  }
+  assert.equal(inhibit(null), 'skipped');
+  assert.equal(inhibit({}), 'inhibit');
+}
+
+const gsdPatch = readFileSync(
+  join(here, '../patches/gsd-logind-null-proxy.patch'), 'utf8');
+assert.match(gsdPatch, /error \? error->message : "unknown error"/);
+assert.match(gsdPatch, /g_object_unref \(bus\);/);
+assert.match(gsdPatch, /if \(user == NULL\)/);
+
+{
+  function stealOrKeep(autoptrReturn) {
+    return autoptrReturn ? 'stolen' : 'uaf';
+  }
+  assert.equal(stealOrKeep(true), 'stolen');
+}
+
+const portalPatch = readFileSync(
+  join(here, '../patches/xdg-desktop-portal-gnome-null-uaf.patch'), 'utf8');
+assert.match(portalPatch, /g_steal_pointer \(&window\)/);
+assert.match(portalPatch, /g_set_object \(&best_match, window\)/);
+assert.match(portalPatch, /if \(info == NULL\)/);
+
+{
+  function updateResults(providers, provider) {
+    if (!providers.includes(provider))
+      return 'skipped';
+    return 'updated';
+  }
+  const gone = {id: 'web'};
+  assert.equal(updateResults([{id: 'apps'}], gone), 'skipped');
+  assert.equal(updateResults([gone], gone), 'updated');
+}
+
+{
+  function emitRemoved(added, canPlay) {
+    if (canPlay)
+      return added ? 'keep' : 'added';
+    return added ? 'removed' : 'silent';
+  }
+  assert.equal(emitRemoved(false, false), 'silent');
+  assert.equal(emitRemoved(true, false), 'removed');
+}
+
+const shellPatch = readFileSync(
+  join(here, '../patches/gnome-shell-search-unlock-mpris.patch'), 'utf8');
+assert.match(shellPatch, /this\._providers\.includes\(provider\)/);
+assert.match(shellPatch, /message\?\.destroy\(\)/);
+assert.match(shellPatch, /else if \(added\)/);
+
+{
+  function portalId(snapName, snapAppName) {
+    if (!snapAppName || snapName === snapAppName)
+      return `snap.${snapName}`;
+    return `snap.${snapName}_${snapAppName}`;
+  }
+  function oldPortalId(snapName, snapAppName) {
+    if (!snapAppName || snapName === snapAppName)
+      return `snap.${snapName}`;
+    return `snap.${snapName}${snapAppName}`;
+  }
+  assert.equal(oldPortalId('firefox', 'firefox'), 'snap.firefox');
+  assert.equal(oldPortalId('foo', 'bar'), 'snap.foobar');
+  assert.equal(portalId('foo', 'bar'), 'snap.foo_bar');
+}
+
+const gccPatch = readFileSync(
+  join(here, '../patches/gnome-control-center-snap-portal-id.patch'), 'utf8');
+assert.match(gccPatch, /snap_name, "_", snap_app_name/);
+assert.match(gccPatch, /error \? error->message : "unknown error"/);
+
+{
+  function addWindowSignals(actor) {
+    if (!actor)
+      return 'skipped';
+    return 'tracked';
+  }
+  assert.equal(addWindowSignals(null), 'skipped');
+  assert.equal(addWindowSignals({}), 'tracked');
+}
+
+const dockPatch = readFileSync(
+  join(here, '../patches/dash-to-dock-intellihide-null-actor.patch'), 'utf8');
+assert.match(dockPatch, /if \(!actor\)/);
+
+const gisPatch = readFileSync(
+  join(here, '../patches/gnome-initial-setup-clear-cancellable.patch'), 'utf8');
+assert.match(gisPatch, /g_clear_object \(&priv->cancellable\)/);
+
+{
+  function anyDataText(anyData) {
+    return typeof anyData === 'string' ? anyData : '';
+  }
+  assert.equal(anyDataText(null), '');
+  assert.equal(anyDataText(undefined), '');
+  assert.equal(anyDataText('Hello').toLowerCase(), 'hello');
+}
+
+const orcaPatch = readFileSync(
+  join(here, '../patches/orca-any-data-none.patch'), 'utf8');
+assert.match(orcaPatch, /isinstance\(event\.any_data, str\)/);
+
 console.log('search-providers.test.mjs: all assertions passed');

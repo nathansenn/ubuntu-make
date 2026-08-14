@@ -7,3 +7,11 @@ desktop-icons-ng-clearwindow-idempotent.patch
 snapd-prompting-teardown.patch
 update-manager-null-xid.patch
 gnome-shell-disposed-last-device.patch
+nautilus-sidebar-null-guards.patch
+gsd-logind-null-proxy.patch
+xdg-desktop-portal-gnome-null-uaf.patch
+gnome-shell-search-unlock-mpris.patch
+gnome-control-center-snap-portal-id.patch
+dash-to-dock-intellihide-null-actor.patch
+gnome-initial-setup-clear-cancellable.patch
+orca-any-data-none.patch

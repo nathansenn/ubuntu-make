@@ -1,0 +1,111 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: event handlers: do not call str methods on None any_data
+
+AT-SPI text events can arrive with any_data=None. .lower(), .strip(),
+and 'in' then raise and take Orca down.
+
+Forwarded: no
+---
+--- a/src/orca/typing_echo_presenter.py	2026-05-26 12:58:36.000000000 +0000
++++ b/src/orca/typing_echo_presenter.py	2026-08-14 09:01:44.183775326 +0000
+@@ -940,6 +940,9 @@
+             debug.print_message(debug.LEVEL_INFO, msg, True)
+             return
+ 
++        if not isinstance(event.any_data, str):
++            return
++
+         character = self._delayed_terminal_press.get_key_name().lower()
+         if event.any_data.lower() == character:
+             msg = "TYPING ECHO PRESENTER: Echoing delayed terminal press."
+--- a/src/orca/live_region_presenter.py	2026-05-26 12:58:36.000000000 +0000
++++ b/src/orca/live_region_presenter.py	2026-08-14 09:01:44.183775326 +0000
+@@ -670,7 +670,7 @@
+             return None
+ 
+         if attrs.get("container-atomic") != "true":
+-            if "\ufffc" not in event.any_data:
++            if not isinstance(event.any_data, str) or "\ufffc" not in event.any_data:
+                 content = event.any_data
+             else:
+                 content = script.utilities.expand_eocs(
+--- a/src/orca/ax_utilities_event.py	2026-05-26 12:58:36.000000000 +0000
++++ b/src/orca/ax_utilities_event.py	2026-08-14 09:01:53.107766769 +0000
+@@ -367,7 +367,7 @@
+                 reason = TextEventReason.AUTO_DELETION
+         else:
+             selected_text, _start, _end = AXUtilitiesText.get_cached_selected_text(obj)
+-            if selected_text and event.any_data.strip() == selected_text.strip():
++            if selected_text and isinstance(event.any_data, str) and event.any_data.strip() == selected_text.strip():
+                 reason = TextEventReason.SELECTED_TEXT_DELETION
+         return reason
+ 
+@@ -392,7 +392,7 @@
+             reason = AXUtilitiesEvent._get_deletion_editable_reason(event, mgr)
+         elif mgr.last_event_was_command():
+             reason = TextEventReason.UNSPECIFIED_COMMAND
+-        elif "\ufffc" in event.any_data and not event.any_data.replace("\ufffc", ""):
++        elif isinstance(event.any_data, str) and "\ufffc" in event.any_data and not event.any_data.replace("\ufffc", ""):
+             reason = TextEventReason.CHILDREN_CHANGE
+         else:
+             reason = TextEventReason.UNKNOWN
+@@ -465,7 +465,7 @@
+             else:
+                 reason = TextEventReason.TYPING
+         elif mgr.last_event_was_tab() or mgr.last_event_was_return():
+-            if not event.any_data.strip():
++            if not isinstance(event.any_data, str) or not event.any_data.strip():
+                 reason = TextEventReason.TYPING
+             else:
+                 reason = AXUtilitiesEvent._get_insertion_fallback_reason(event, mgr)
+@@ -558,7 +558,7 @@
+             reason = AXUtilitiesEvent._get_insertion_editable_reason(event, mgr)
+         elif mgr.last_event_was_command():
+             reason = TextEventReason.UNSPECIFIED_COMMAND
+-        elif "\ufffc" in event.any_data and not event.any_data.replace("\ufffc", ""):
++        elif isinstance(event.any_data, str) and "\ufffc" in event.any_data and not event.any_data.replace("\ufffc", ""):
+             reason = TextEventReason.CHILDREN_CHANGE
+         else:
+             reason = TextEventReason.UNKNOWN
+@@ -848,6 +848,7 @@
+         if (
+             AXUtilitiesState.is_editable(focus)
+             and AXText.get_character_count(focus)
++            and isinstance(event.any_data, str)
+             and AXText.get_all_text(focus) in event.any_data
+         ):
+             msg = "AXUtilitiesEvent: Event is redundant notification for the locus of focus."
+--- a/src/orca/chat_presenter.py	2026-05-26 12:58:36.000000000 +0000
++++ b/src/orca/chat_presenter.py	2026-08-14 09:01:49.391770125 +0000
+@@ -577,7 +577,7 @@
+                 name = chat.get_chat_room_name(event.source)
+                 conversation = Conversation(name, event.source)
+             name = conversation.get_name()
+-            message = event.any_data.strip("\n")
++            message = event.any_data.strip("\n") if isinstance(event.any_data, str) else ""
+             if message:
+                 conversation.add_message(message)
+                 chat.add_message(message, conversation)
+--- a/src/orca/scripts/terminal/script_utilities.py	2026-05-26 12:58:36.000000000 +0000
++++ b/src/orca/scripts/terminal/script_utilities.py	2026-08-14 09:01:56.827763696 +0000
+@@ -104,7 +104,9 @@
+         """Returns true if we should treat this event as resulting from a command."""
+ 
+         if event.source != focus_manager.get_manager().get_locus_of_focus() or not (
+-            event.type.startswith("object:text-changed:insert") and event.any_data.strip()
++            event.type.startswith("object:text-changed:insert")
++            and isinstance(event.any_data, str)
++            and event.any_data.strip()
+         ):
+             return False
+ 
+@@ -128,7 +130,7 @@
+         if input_event_manager.get_manager().last_event_was_command():
+             return False
+ 
+-        if event.type.startswith("object:text-changed:delete") and event.any_data.strip():
++        if event.type.startswith("object:text-changed:delete") and isinstance(event.any_data, str) and event.any_data.strip():
+             manager = input_event_manager.get_manager()
+             if manager.last_event_was_return_tab_or_space():
+                 return True

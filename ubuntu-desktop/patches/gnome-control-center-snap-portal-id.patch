@@ -1,0 +1,44 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: cc-util: insert underscore in multi-app snap portal IDs
+
+Portal IDs for snaps with a distinct app name must be
+snap.<name>_<app>. The Settings helper concatenated the two names
+with no separator, so permission lookups missed. Also guard nullable
+GError from secret_service_get_* in desktop sharing.
+
+Forwarded: no
+---
+--- a/panels/common/cc-util.c	2026-08-14 09:02:36.000000000 +0000
++++ b/panels/common/cc-util.c	2026-08-14 09:01:44.163775347 +0000
+@@ -302,7 +302,7 @@
+       if (!snap_app_name || g_str_equal (snap_name, snap_app_name))
+         return g_strconcat (PORTAL_SNAP_PREFIX, snap_name, NULL);
+ 
+-      return g_strconcat (PORTAL_SNAP_PREFIX, snap_name, snap_app_name, NULL);
++      return g_strconcat (PORTAL_SNAP_PREFIX, snap_name, "_", snap_app_name, NULL);
+     }
+ 
+   return NULL;
+--- a/panels/system/remote-desktop/cc-desktop-sharing-page.c	2026-08-14 09:02:36.000000000 +0000
++++ b/panels/system/remote-desktop/cc-desktop-sharing-page.c	2026-08-14 09:01:44.519774973 +0000
+@@ -451,7 +451,8 @@
+   service = secret_service_get_sync (SECRET_SERVICE_LOAD_COLLECTIONS, NULL, &error);
+   if (!service)
+     {
+-      g_debug ("Can't connect to secret service: %s", error->message);
++      g_debug ("Can't connect to secret service: %s",
++               error ? error->message : "unknown error");
+       return;
+     }
+ 
+@@ -487,7 +488,8 @@
+   service = secret_service_get_finish (result, &error);
+   if (!service)
+     {
+-      g_debug ("Can't connect to secret service: %s", error->message);
++      g_debug ("Can't connect to secret service: %s",
++               error ? error->message : "unknown error");
+       return;
+     }
+ 
