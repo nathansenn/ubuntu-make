@@ -1,3 +1,5 @@
 # Ubuntu 26.04.1 (Resolute) desktop — non-performance fixes
-# Apply from the unpacked gnome-shell-ubuntu-extensions source root.
+# Apply each patch from the matching unpacked source root.
 gnome-shell-ubuntu-extensions-search-providers.patch
+gnome-shell-unguarded-splice.patch
+nautilus-xdg-terminal-exec-leak.patch

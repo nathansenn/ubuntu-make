@@ -1,0 +1,151 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: search-style: do not splice(-1) when indexOf misses
+
+Same class as LP #2161808: Array.splice(-1, 1) removes the last
+unrelated entry. Guard every remaining gnome-shell indexOf+splice
+that lacked an index check, including app-folder deletion (can drop
+the wrong folder from org.gnome.desktop.app-folders) and the logout
+inhibitor list.
+
+Forwarded: no
+---
+--- a/js/ui/appDisplay.js
++++ b/js/ui/appDisplay.js
+@@ -1058,6 +1058,8 @@
+ 
+     _removeItem(item) {
+         const iconIndex = this._orderedItems.indexOf(item);
++        if (iconIndex < 0)
++            return;
+ 
+         this._orderedItems.splice(iconIndex, 1);
+         this._items.delete(item.id);
+@@ -1202,7 +1204,9 @@
+         this._grid.moveItem(item, newPage, newPosition);
+ 
+         // Update the _orderedItems array
+-        this._orderedItems.splice(this._orderedItems.indexOf(item), 1);
++        const currentIndex = this._orderedItems.indexOf(item);
++        if (currentIndex >= 0)
++            this._orderedItems.splice(currentIndex, 1);
+         this._orderedItems.splice(this._getLinearPosition(item), 0, item);
+     }
+ 
+@@ -2239,8 +2243,11 @@
+ 
+             const settings = new Gio.Settings({schema_id: 'org.gnome.desktop.app-folders'});
+             const folders = settings.get_strv('folder-children');
+-            folders.splice(folders.indexOf(this._id), 1);
+-            settings.set_strv('folder-children', folders);
++            const folderIndex = folders.indexOf(this._id);
++            if (folderIndex >= 0) {
++                folders.splice(folderIndex, 1);
++                settings.set_strv('folder-children', folders);
++            }
+ 
+             this._deletingFolder = false;
+         } else {
+--- a/js/ui/endSessionDialog.js
++++ b/js/ui/endSessionDialog.js
+@@ -588,7 +588,9 @@
+         } else {
+             // inhibiting app is a service (not an application) or is not
+             // inhibiting logout/shutdown
+-            this._applications.splice(this._applications.indexOf(inhibitor), 1);
++            const inhibitorIndex = this._applications.indexOf(inhibitor);
++            if (inhibitorIndex >= 0)
++                this._applications.splice(inhibitorIndex, 1);
+         }
+ 
+         this._sync();
+--- a/js/ui/layout.js
++++ b/js/ui/layout.js
+@@ -1296,7 +1296,9 @@
+ 
+     removeBarrier(barrier) {
+         this._disconnectBarrier(barrier);
+-        this._barriers.splice(this._barriers.indexOf(barrier), 1);
++        const barrierIndex = this._barriers.indexOf(barrier);
++        if (barrierIndex >= 0)
++            this._barriers.splice(barrierIndex, 1);
+     }
+ 
+     destroy() {
+--- a/js/ui/dateMenu.js
++++ b/js/ui/dateMenu.js
+@@ -780,7 +780,9 @@
+     }
+ 
+     _onSourceRemoved(tray, source) {
+-        this._sources.splice(this._sources.indexOf(source), 1);
++        const sourceIndex = this._sources.indexOf(source);
++        if (sourceIndex >= 0)
++            this._sources.splice(sourceIndex, 1);
+         this._updateCount();
+     }
+ 
+--- a/js/ui/workspaceAnimation.js
++++ b/js/ui/workspaceAnimation.js
+@@ -73,7 +73,9 @@
+ 
+         windowActor.connectObject('destroy', () => {
+             clone.destroy();
+-            this._windowRecords.splice(this._windowRecords.indexOf(record), 1);
++            const recordIndex = this._windowRecords.indexOf(record);
++            if (recordIndex >= 0)
++                this._windowRecords.splice(recordIndex, 1);
+         }, this);
+ 
+         this._windowRecords.push(record);
+--- a/js/ui/workspace.js
++++ b/js/ui/workspace.js
+@@ -841,7 +841,9 @@
+             window.remove_transition('allocation');
+ 
+         this._windows.delete(window);
+-        this._sortedWindows.splice(this._sortedWindows.indexOf(window), 1);
++        const sortedIndex = this._sortedWindows.indexOf(window);
++        if (sortedIndex >= 0)
++            this._sortedWindows.splice(sortedIndex, 1);
+ 
+         // The layout might be frozen and we might not update the windowSlots
+         // on the next allocation, so remove the slot now already
+--- a/js/ui/messageList.js
++++ b/js/ui/messageList.js
+@@ -1594,7 +1594,10 @@
+             duration: MESSAGE_ANIMATION_TIME,
+             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+             onComplete: () => {
+-                this.messages.splice(this.messages.indexOf(message), 1);
++                const messageIndex = this.messages.indexOf(message);
++                if (messageIndex < 0)
++                    return;
++                this.messages.splice(messageIndex, 1);
+                 this.messages.splice(index, 0, message);
+                 this.queue_relayout();
+                 item.ease({
+--- a/js/ui/iconGrid.js
++++ b/js/ui/iconGrid.js
+@@ -427,7 +427,8 @@
+ 
+         this._unlinkItem(item);
+ 
+-        page.children.splice(itemIndex, 1);
++        if (itemIndex >= 0)
++            page.children.splice(itemIndex, 1);
+ 
+         this._updateVisibleChildrenForPage(pageIndex);
+ 
+--- a/js/ui/workspaceThumbnail.js
++++ b/js/ui/workspaceThumbnail.js
+@@ -1133,7 +1133,8 @@
+                     thumbnail.state = ThumbnailState.DESTROYED;
+ 
+                     const index = this._thumbnails.indexOf(thumbnail);
+-                    this._thumbnails.splice(index, 1);
++                    if (index >= 0)
++                        this._thumbnails.splice(index, 1);
+                     thumbnail.destroy();
+ 
+                     this._queueUpdateStates();

@@ -3,6 +3,30 @@
 Researched against the Resolute 26.04.1 source trees fetched into `src/`.
 Performance / I/O / SIMD issues are out of scope (see `ubuntu24/`).
 
+## Fixed here (`patches/gnome-shell-unguarded-splice.patch`)
+
+Same class as LP #2161808, still present in gnome-shell 50.1-0ubuntu1.2
+outside `search.js`: `indexOf` + `splice` with no `index < 0` guard.
+
+| Site | What `splice(-1)` drops |
+|---|---|
+| `js/ui/appDisplay.js` `_removeItem` / `_moveItem` | last app icon in the grid |
+| `js/ui/appDisplay.js` folder delete | **wrong folder** from `org.gnome.desktop.app-folders` |
+| `js/ui/endSessionDialog.js` | last logout inhibitor |
+| `js/ui/layout.js` | last pressure barrier (hot corner) |
+| `js/ui/dateMenu.js` | last notification source |
+| `js/ui/workspace.js` / `workspaceAnimation.js` / `workspaceThumbnail.js` | last overview window/thumbnail |
+| `js/ui/messageList.js` `_moveMessage` | last banner if the message was destroyed mid-animation |
+| `js/ui/iconGrid.js` `_removeItemData` | last child on the page |
+
+## Fixed here (`patches/nautilus-xdg-terminal-exec-leak.patch`)
+
+Ubuntu's `xdg-terminal-exec` path in `nautilus_files_view_update_actions_state()`
+(runs on every selection change) called `g_app_info_create_from_commandline()`
+unconditionally, leaking the previous static `GAppInfo`. Failure used
+`error->message` without a NULL check (same class as LP #2000063). Open in
+Terminal leaked the `GFile` because `g_autoptr(GList)` does not free list data.
+
 ## Fixed here (`patches/gnome-shell-ubuntu-extensions-search-providers.patch`)
 
 ### LP #2150103 / #2161808 / #2156486 — overview search dies after lock

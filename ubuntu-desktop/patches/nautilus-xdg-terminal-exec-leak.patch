@@ -1,0 +1,47 @@
+From: Ubuntu Desktop bug work
+Date: Fri, 14 Aug 2026 00:00:00 +0000
+Subject: files-view: fix xdg-terminal-exec leak and nullable GError
+
+nautilus_files_view_update_actions_state() ran on every selection
+change and called g_app_info_create_from_commandline() without
+reusing or unreffing the static GAppInfo. Failure also dereferenced
+error->message when error was NULL. Open-in-terminal leaked the GFile
+because g_autoptr(GList) does not free list data.
+
+Forwarded: no
+---
+--- a/src/nautilus-files-view.c
++++ b/src/nautilus-files-view.c
+@@ -2427,11 +2427,12 @@
+ {
+     g_autoptr (GdkAppLaunchContext) context = NULL;
+     g_autoptr (GError) error = NULL;
+-    g_autoptr (GList) list = NULL;
++    g_autolist (GFile) list = NULL;
+     GdkDisplay *display;
+     GFile *gfile;
+ 
+     g_return_if_fail (xdg_terminal_exec_app);
++    g_return_if_fail (file != NULL);
+ 
+     gfile = nautilus_file_get_location (file);
+     list = g_list_append (list, gfile);
+@@ -7687,7 +7688,7 @@
+ #ifdef XDG_TERMINAL_EXEC
+     enable_console = FALSE;
+     enable_xdg_terminal_exec = !!g_find_program_in_path ("xdg-terminal-exec");
+-    if (enable_xdg_terminal_exec)
++    if (enable_xdg_terminal_exec && xdg_terminal_exec_app == NULL)
+     {
+         g_autoptr (GError) error = NULL;
+         xdg_terminal_exec_app =
+@@ -7697,7 +7698,8 @@
+                                                 &error);
+         if (!xdg_terminal_exec_app)
+         {
+-            g_warning ("Could not initialize xdg-terminal-exec: %s", error->message);
++            g_warning ("Could not initialize xdg-terminal-exec: %s",
++                       error != NULL ? error->message : "unknown error");
+             enable_xdg_terminal_exec = FALSE;
+         }
+     }

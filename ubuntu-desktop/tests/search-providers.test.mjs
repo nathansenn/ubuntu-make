@@ -119,4 +119,36 @@ assert.match(patch, /snapHandler = snapProtoHandler/);
 assert.match(patch, /class WebSearchProviderExtension/);
 assert.match(patch, /cancellable\.is_cancelled\(\)/);
 
+// App-folder deletion must not splice(-1) a missing folder id.
+{
+  function deleteFolder(folders, id) {
+    const folderIndex = folders.indexOf(id);
+    if (folderIndex >= 0)
+      folders.splice(folderIndex, 1);
+    return folders;
+  }
+  function oldDeleteFolder(folders, id) {
+    folders.splice(folders.indexOf(id), 1);
+    return folders;
+  }
+  assert.deepEqual(oldDeleteFolder(['work', 'games', 'utils'], 'missing'),
+    ['work', 'games'],
+    'old folder delete drops the last unrelated folder');
+  assert.deepEqual(deleteFolder(['work', 'games', 'utils'], 'missing'),
+    ['work', 'games', 'utils']);
+  assert.deepEqual(deleteFolder(['work', 'games'], 'games'), ['work']);
+}
+
+const splicePatch = readFileSync(
+  join(here, '../patches/gnome-shell-unguarded-splice.patch'), 'utf8');
+assert.match(splicePatch, /folderIndex >= 0/);
+assert.match(splicePatch, /inhibitorIndex >= 0/);
+assert.match(splicePatch, /messageIndex < 0/);
+
+const nautilusPatch = readFileSync(
+  join(here, '../patches/nautilus-xdg-terminal-exec-leak.patch'), 'utf8');
+assert.match(nautilusPatch, /xdg_terminal_exec_app == NULL/);
+assert.match(nautilusPatch, /error != NULL \? error->message/);
+assert.match(nautilusPatch, /g_autolist \(GFile\)/);
+
 console.log('search-providers.test.mjs: all assertions passed');

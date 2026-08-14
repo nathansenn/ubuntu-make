@@ -24,11 +24,17 @@ sudo apt-get update
 The script pulls the `ubuntu-desktop` / `ubuntu-desktop-minimal` seed plus the
 GNOME 50 session stack (mutter, gdm3, nautilus, settings, portals, …).
 
-## Apply the search-provider patch
+## Apply patches
 
 ```bash
 cd ubuntu-desktop/src/gnome-shell-ubuntu-extensions-50.26.04.7ubuntu
 patch -p1 < ../../patches/gnome-shell-ubuntu-extensions-search-providers.patch
+
+cd ../gnome-shell-50.1
+patch -p1 < ../../patches/gnome-shell-unguarded-splice.patch
+
+cd ../nautilus-50.2.2
+patch -p1 < ../../patches/nautilus-xdg-terminal-exec-leak.patch
 ```
 
 ## Tests
