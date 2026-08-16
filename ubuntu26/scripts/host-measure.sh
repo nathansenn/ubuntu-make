@@ -42,15 +42,15 @@ cd "$WORK/gzip-stock"
 dpkg-source -x "$SRC"/gzip_1.14-1~exp2ubuntu1.1.dsc >/dev/null
 cd gzip-1.14
 ./configure >/dev/null
-make -j"$(nproc)" >/dev/null
+# Skip texinfo; gzip.o needs a configured tree (gnulib).
+make -j"$(nproc)" gzip || make gzip
 cp gzip "$WORK/gzip-stock.bin"
 
-cd "$WORK/gzip-patched"
-dpkg-source -x "$SRC"/gzip_1.14-1~exp2ubuntu1.1.dsc >/dev/null
-cd gzip-1.14
+cp -a "$WORK/gzip-stock/gzip-1.14" "$WORK/gzip-patched-tree"
+cd "$WORK/gzip-patched-tree"
 patch -p1 < "$ROOT/patches/gzip-1.14-inflate-hotpaths.patch"
-./configure CFLAGS="-O2 -DUNALIGNED_OK" >/dev/null
-make -j"$(nproc)" >/dev/null
+rm -f inflate.o bits.o gzip
+make inflate.o bits.o gzip
 cp gzip "$WORK/gzip-patched.bin"
 
 dd if=/dev/urandom of="$WORK/rand32m" bs=1M count=32 status=none
@@ -85,8 +85,8 @@ head -c 33554432 "$WORK/text32m" > "$WORK/text32m.bin" || true
   /usr/bin/time -f "rand patched %e s" "$WORK/gzip-patched.bin" -dc "$WORK/rand32m.gz" > /dev/null
   echo
   echo '== tar -b20 vs -b512 =='
-  /usr/bin/time -f "tar cf -b20  %e s" tar -b 20 cf "$WORK/a.tar" -C "$WORK" rand32m text32m.bin
-  /usr/bin/time -f "tar cf -b512 %e s" tar -b 512 cf "$WORK/b.tar" -C "$WORK" rand32m text32m.bin
+  /usr/bin/time -f "tar cf -b20  %e s" tar -b 20 -c -f "$WORK/a.tar" -C "$WORK" rand32m text32m.bin
+  /usr/bin/time -f "tar cf -b512 %e s" tar -b 512 -c -f "$WORK/b.tar" -C "$WORK" rand32m text32m.bin
   echo '```'
 } | tee "$OUT"
 echo "Wrote $OUT"

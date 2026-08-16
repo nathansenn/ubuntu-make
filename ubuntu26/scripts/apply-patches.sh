@@ -28,5 +28,9 @@ while read -r line; do
   case "$line" in
     \#*) continue ;;
   esac
+  # Allow "file.patch   # comment"
+  line="${line%%#*}"
+  line=$(printf '%s' "$line" | tr -d '[:space:]')
+  [ -z "$line" ] && continue
   apply_one "$line"
 done < "$SERIES"

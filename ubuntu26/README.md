@@ -34,16 +34,16 @@ Measured on the host Xeon (SHA-NI, AVX2, PCLMUL) with Resolute 26.04 sources, pl
 
 | Change | vs Ubuntu 26.04 stock | Decision |
 |---|---|---|
-| zlib 1.3.1 CRC-32 PCLMUL folding (ifunc + CPUID) | re-measured on Resolute 1.3.1; see RESULTS.md | KEEP |
-| zlib 1.3.1 Adler-32 SSSE3 (ifunc + CPUID) | re-measured on Resolute 1.3.1; see RESULTS.md | KEEP |
-| gzip 1.14 stored-block bulk copy + dist=1 memset + `copy_block` memcpy + fixed-Huffman cache + `UNALIGNED_OK` | leftover after upstream CRC | KEEP |
-| tar `DEFAULT_BLOCKING` 20 → 512 | 10 KiB → 256 KiB records | KEEP |
-| grep `GOOD_READSIZE_MIN` 96 → 256 KiB | fewer syscalls | KEEP |
+| zlib 1.3.1 CRC-32 PCLMUL folding (ifunc + CPUID) | **4.52×** (26.7 vs 5.9 GB/s, 128 MiB warm) | KEEP |
+| zlib 1.3.1 Adler-32 SSSE3 (ifunc + CPUID) | **6.71×** (25.6 vs 3.8 GB/s) | KEEP |
+| gzip 1.14 stored-block + dist=1 + `copy_block` + fixed Huffman + `UNALIGNED_OK` | **1.50×** text, **12.2×** incompressible | KEEP |
+| tar `DEFAULT_BLOCKING` 20 → 512 | 1.03× on host tmpfs; 0.53× under TCG | KEEP for disk |
+| grep `GOOD_READSIZE_MIN` 96 → 256 KiB | fewer syscalls; `read()` already plateaus at 256 KiB | KEEP |
 | diffutils `cmp` buffer floor 256 KiB | 32× fewer `read`s | KEEP |
 | git 2.53 `copy_fd` 8 KiB → 256 KiB | same KEEP as 2.43 | KEEP |
-| rust-coreutils `yes` `BUF_SIZE` 16 KiB → 256 KiB | **new 26.04 default-provider win** | KEEP |
-| rust-coreutils `tee` large-input buffer 32 KiB → 256 KiB | large-file path only | KEEP |
-| gnu-coreutils 9.7 leftover `yes`/`tr`/`tee`/`tac` BUFSIZ | for `coreutils-from-gnu` | KEEP |
+| rust-coreutils `yes` 16→256 KiB | ~1.00× warm | DISCARD |
+| rust-coreutils `tee` 32→256 KiB | already at plateau | DISCARD |
+| gnu-coreutils 9.7 leftover BUFSIZ | warm 8 KiB ≈ 256 KiB here | DISCARD |
 
 `__builtin_cpu_supports()` still returns 0 inside GNU ifunc resolvers. zlib resolvers use **CPUID leaf 1**.
 

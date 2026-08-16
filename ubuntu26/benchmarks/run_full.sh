@@ -43,12 +43,12 @@ yes "the quick brown fox jumps over the lazy dog $RANDOM" | head -c 33554432 > "
   done
   echo
   echo '== tar default blocking =='
-  timeit "tar cf default" tar cf "$TMP/a.tar" -C "$TMP" text32m rand32m
+  timeit "tar cf default" tar -c -f "$TMP/a.tar" -C "$TMP" text32m rand32m
   mkdir -p "$TMP/x"
-  timeit "tar xf default" tar xf "$TMP/a.tar" -C "$TMP/x"
-  timeit "tar cf -b512" tar -b 512 cf "$TMP/b.tar" -C "$TMP" text32m rand32m
+  timeit "tar xf default" tar -x -f "$TMP/a.tar" -C "$TMP/x"
+  timeit "tar cf -b512" tar -b 512 -c -f "$TMP/b.tar" -C "$TMP" text32m rand32m
   mkdir -p "$TMP/y"
-  timeit "tar xf -b512" tar -b 512 xf "$TMP/b.tar" -C "$TMP/y"
+  timeit "tar xf -b512" tar -b 512 -x -f "$TMP/b.tar" -C "$TMP/y"
   echo
   echo '== cmp identical 256 MiB =='
   dd if=/dev/zero of="$TMP/z1" bs=1M count=256 status=none

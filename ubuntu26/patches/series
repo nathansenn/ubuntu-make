@@ -4,6 +4,6 @@ tar-1.35-256k-blocking.patch
 grep-3.12-256k-buf.patch
 diffutils-3.12-256k-cmpbuf.patch
 git-2.53-256k-copyfd.patch
-rust-coreutils-0.8.0-256k-yes.patch
-rust-coreutils-0.8.0-256k-tee.patch
-gnu-coreutils-9.7-256k-leftover.patch
+# rust-coreutils-0.8.0-256k-yes.patch   DISCARD: 16 KiB already at write plateau
+# rust-coreutils-0.8.0-256k-tee.patch   DISCARD: 32 KiB already at plateau
+# gnu-coreutils-9.7-256k-leftover.patch DISCARD: warm 8 KiB ≈ 256 KiB here
