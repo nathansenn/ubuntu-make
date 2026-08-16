@@ -1,0 +1,11 @@
+--- git-2.53.0/copy.c	2026-01-01 00:00:00.000000000 +0000
++++ git-2.53.0/copy.c	2026-08-16 00:00:00.000000000 +0000
+@@ -10,7 +10,7 @@
+ int copy_fd(int ifd, int ofd)
+ {
+ 	while (1) {
+-		char buffer[8192];
++		char buffer[256 * 1024];
+ 		ssize_t len = xread(ifd, buffer, sizeof(buffer));
+ 		if (!len)
+ 			break;

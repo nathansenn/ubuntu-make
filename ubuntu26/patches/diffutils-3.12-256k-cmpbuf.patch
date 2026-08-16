@@ -1,0 +1,44 @@
+--- diffutils-3.12/lib/cmpbuf.h	2025-01-01 00:00:00.000000000 +0000
++++ diffutils-3.12/lib/cmpbuf.h	2026-08-16 00:00:00.000000000 +0000
+@@ -18,6 +18,10 @@
+ #include "idx.h"
+ #include <stddef.h>
+ ptrdiff_t block_read (int, char *, idx_t);
++
++/* Floor for bytewise comparison buffers (cmp, diff -q).
++   256 KiB matches the sequential read() plateau on modern Linux.  */
++enum { CMP_IO_BUFSIZE = 256 * 1024 };
+ idx_t buffer_lcm (idx_t, idx_t, idx_t) _GL_ATTRIBUTE_CONST;
+--- diffutils-3.12/lib/cmpbuf.c	2025-01-01 00:00:00.000000000 +0000
++++ diffutils-3.12/lib/cmpbuf.c	2026-08-16 00:00:00.000000000 +0000
+@@ -107,7 +107,7 @@
+      B must be nonnegative, GCC generates better code from (A <= 0)
+      than from (A != 0).  */
+   if (a <= 0)
+-    return b <= 0 ? 8 * 1024 : b;
++    return b <= 0 ? CMP_IO_BUFSIZE : b;
+   if (b <= 0)
+     return a;
+ 
+@@ -118,5 +118,9 @@
+ 
+   /* Yield a if there is an overflow.  */
+   idx_t q = a / n, lcm;
+-  return !ckd_mul (&lcm, b, q) && lcm <= lcm_max ? lcm : a;
++  if (!ckd_mul (&lcm, b, q) && lcm <= lcm_max)
++    a = lcm;
++  if (a < CMP_IO_BUFSIZE && CMP_IO_BUFSIZE <= lcm_max)
++    a = CMP_IO_BUFSIZE;
++  return a;
+ }
+--- diffutils-3.12/src/cmp.c	2025-01-01 00:00:00.000000000 +0000
++++ diffutils-3.12/src/cmp.c	2026-08-16 00:00:00.000000000 +0000
+@@ -310,7 +310,7 @@
+         {
+ 	  stat_buf[f].st_size = -2;
+ #if HAVE_STRUCT_STAT_ST_BLKSIZE
+-          stat_buf[f].st_blksize = 8 * 1024;
++          stat_buf[f].st_blksize = CMP_IO_BUFSIZE;
+ #endif
+         }
+       else

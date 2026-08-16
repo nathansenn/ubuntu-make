@@ -1,0 +1,32 @@
+#cloud-config
+hostname: resolute-perf
+manage_etc_hosts: true
+users:
+  - name: ubuntu
+    gecos: Ubuntu
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: [adm, sudo]
+    shell: /bin/bash
+    lock_passwd: false
+    ssh_authorized_keys:
+      - SSH_PUBKEY_PLACEHOLDER
+ssh_pwauth: true
+package_update: true
+package_upgrade: true
+packages:
+  - openssh-server
+  - qemu-guest-agent
+  - build-essential
+  - git
+  - python3
+  - python3-yaml
+  - python3-pip
+  - pkg-config
+  - zlib1g-dev
+  - libssl-dev
+  - ubuntu-desktop
+runcmd:
+  - [systemctl, enable, --now, ssh]
+  - [systemctl, enable, --now, qemu-guest-agent]
+  - [touch, /var/lib/cloud/instance/packages-done]
+final_message: "Ubuntu 26.04 full desktop is ready after $UPTIME seconds"

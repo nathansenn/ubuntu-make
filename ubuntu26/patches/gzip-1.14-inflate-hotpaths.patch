@@ -1,0 +1,220 @@
+--- gzip-1.14/inflate.c	2025-03-28 02:40:28.000000000 +0000
++++ gzip-1.14/inflate.c	2026-08-16 11:42:04.402379065 +0000
+@@ -598,10 +598,31 @@
+         }
+         else                      /* do it slow to avoid memcpy() overlap */
+ #endif
+-          do {
+-            slide[w++] = slide[d++];
+-            Tracevv((stderr, "%c", slide[w-1]));
+-          } while (--e);
++          {
++            unsigned dist = (d < w) ? (w - d) : (d - w);
++            if (dist == 1)
++              {
++                memset (slide + w, slide[d], e);
++                w += e;
++                d += e;
++              }
++            else
++              {
++                while (e > 2)
++                  {
++                    slide[w++] = slide[d++];
++                    slide[w++] = slide[d++];
++                    slide[w++] = slide[d++];
++                    e -= 3;
++                  }
++                if (e)
++                  {
++                    slide[w++] = slide[d++];
++                    if (e > 1)
++                      slide[w++] = slide[d++];
++                  }
++              }
++          }
+         if (w == WSIZE)
+         {
+           flush_output(w);
+@@ -654,18 +675,40 @@
+   DUMPBITS(16)
+ 
+ 
+-  /* read and output the compressed data */
+-  while (n--)
+-  {
+-    NEEDBITS(8)
+-    slide[w++] = (uch)b;
+-    if (w == WSIZE)
++  /* Payload is byte-aligned (k == 0 after LEN/NLEN).  Copy from inbuf
++     instead of NEEDBITS(8) per byte.  */
++  bb = b;
++  bk = k;
++  while (n > 0)
+     {
+-      flush_output(w);
+-      w = 0;
++      unsigned m;
++      unsigned avail;
++
++      if (inptr >= insize)
++        {
++          wp = w;
++          if (fill_inbuf (0) == EOF)
++            return 1;
++          inptr = 0;
++        }
++      avail = insize - inptr;
++      m = n;
++      if (m > avail)
++        m = avail;
++      if (m > WSIZE - w)
++        m = WSIZE - w;
++      memcpy (slide + w, inbuf + inptr, m);
++      inptr += m;
++      w += m;
++      n -= m;
++      if (w == WSIZE)
++        {
++          flush_output (w);
++          w = 0;
++        }
+     }
+-    DUMPBITS(8)
+-  }
++  b = bb;
++  k = bk;
+ 
+ 
+   /* restore the globals from the locals */
+@@ -677,54 +720,45 @@
+ 
+ 
+ 
+-/* decompress an inflated type 1 (fixed Huffman codes) block.  We should
+-   either replace this with a custom decoder, or at least precompute the
+-   Huffman tables. */
++/* decompress an inflated type 1 (fixed Huffman codes) block.
++   Tables are built once and reused; gzip inflate is single-threaded. */
+ static int
+ inflate_fixed(void)
+ {
+-  int i;                /* temporary variable */
+-  struct huft *tl;      /* literal/length code table */
+-  struct huft *td;      /* distance code table */
+-  int bl;               /* lookup bits for tl */
+-  int bd;               /* lookup bits for td */
+-  unsigned l[288];      /* length list for huft_build */
+-
+-
+-  /* set up literal table */
+-  for (i = 0; i < 144; i++)
+-    l[i] = 8;
+-  for (; i < 256; i++)
+-    l[i] = 9;
+-  for (; i < 280; i++)
+-    l[i] = 7;
+-  for (; i < 288; i++)          /* make a complete, but wrong code set */
+-    l[i] = 8;
+-  bl = 7;
+-  if ((i = huft_build(l, 288, 257, cplens, cplext, &tl, &bl)) != 0)
+-    return i;
+-
+-
+-  /* set up distance table */
+-  for (i = 0; i < 30; i++)      /* make an incomplete code set */
+-    l[i] = 5;
+-  bd = 5;
+-  if ((i = huft_build(l, 30, 0, cpdist, cpdext, &td, &bd)) > 1)
+-  {
+-    huft_free(tl);
+-    return i;
+-  }
+-
+-
+-  /* decompress until an end-of-block code */
+-  if (inflate_codes(tl, td, bl, bd))
+-    return 1;
++  static struct huft *fixed_tl;
++  static struct huft *fixed_td;
++  static int fixed_bl = 7;
++  static int fixed_bd = 5;
++  static int fixed_ready;
++  int i;
++  unsigned l[288];
+ 
++  if (!fixed_ready)
++    {
++      for (i = 0; i < 144; i++)
++        l[i] = 8;
++      for (; i < 256; i++)
++        l[i] = 9;
++      for (; i < 280; i++)
++        l[i] = 7;
++      for (; i < 288; i++)
++        l[i] = 8;
++      fixed_bl = 7;
++      if ((i = huft_build (l, 288, 257, cplens, cplext, &fixed_tl, &fixed_bl)) != 0)
++        return i;
++
++      for (i = 0; i < 30; i++)
++        l[i] = 5;
++      fixed_bd = 5;
++      if ((i = huft_build (l, 30, 0, cpdist, cpdext, &fixed_td, &fixed_bd)) > 1)
++        {
++          huft_free (fixed_tl);
++          return i;
++        }
++      fixed_ready = 1;
++    }
+ 
+-  /* free the decoding tables, return */
+-  huft_free(tl);
+-  huft_free(td);
+-  return 0;
++  return inflate_codes (fixed_tl, fixed_td, fixed_bl, fixed_bd) ? 1 : 0;
+ }
+ 
+ 
+--- gzip-1.14/bits.c	2025-01-03 17:33:26.000000000 +0000
++++ gzip-1.14/bits.c	2026-08-16 11:42:03.762377140 +0000
+@@ -208,7 +208,15 @@
+ #ifdef DEBUG
+     bits_sent += (off_t)len<<3;
+ #endif
+-    while (len--) {
+-        put_byte(*buf++);
++    while (len > 0) {
++        unsigned n = OUTBUFSIZ - outcnt;
++        if (n > len)
++            n = len;
++        memcpy (outbuf + outcnt, buf, n);
++        outcnt += n;
++        buf += n;
++        len -= n;
++        if (outcnt == OUTBUFSIZ)
++            flush_outbuf ();
+     }
+ }
+--- gzip-1.14/tailor.h	2025-01-03 17:33:26.000000000 +0000
++++ gzip-1.14/tailor.h	2026-08-16 11:42:03.778377188 +0000
+@@ -205,3 +205,7 @@
+ #  define FALLTHROUGH __attribute__ ((__fallthrough__))
+ # endif
+ #endif
++
++#if defined(__x86_64__) && !defined(UNALIGNED_OK)
++# define UNALIGNED_OK
++#endif
+--- gzip-1.14/debian/rules	2026-02-27 17:00:01.000000000 +0000
++++ gzip-1.14/debian/rules	2026-08-16 11:42:03.822377320 +0000
+@@ -8,6 +8,9 @@
+ ifeq (${DEB_HOST_ARCH},s390x)
+ DEB_CPPFLAGS_MAINT_APPEND := -DDFLTCC -DDFLTCC_LEVEL_MASK=0x7e
+ endif
++ifeq (${DEB_HOST_ARCH},amd64)
++DEB_CPPFLAGS_MAINT_APPEND := -DUNALIGNED_OK
++endif
+ 
+ RECONF_ITEMS=\
+  INSTALL \

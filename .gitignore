@@ -46,3 +46,18 @@ debian/files
 debian/*substvars
 debian/*.debhelper
 debian/*.1
+
+# Ubuntu 26.04 VM images, firmware vars, and unpacked apt sources
+ubuntu26/vm/*.img
+ubuntu26/vm/*.qcow2
+ubuntu26/vm/*.iso
+ubuntu26/vm/*.fd
+ubuntu26/vm/*.pid
+ubuntu26/vm/id_ed25519
+ubuntu26/vm/user-data.generated
+ubuntu26/vm/serial.log
+ubuntu26/vm/*.tar.xz
+ubuntu26/src/
+ubuntu24/src/
+coreutils-*/
+git-*/

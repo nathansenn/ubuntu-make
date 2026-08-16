@@ -1,0 +1,21 @@
+--- rust-coreutils-0.8.0/src/uu/tee/src/tee.rs	2026-01-01 00:00:00.000000000 +0000
++++ rust-coreutils-0.8.0/src/uu/tee/src/tee.rs	2026-08-16 00:00:00.000000000 +0000
+@@ -120,13 +120,13 @@
+     // https://github.com/rust-lang/rust/blob/2feb91181882e525e698c4543063f4d0296fcf91/library/std/src/sys/io/mod.rs#L44
+     const FIRST_BUF_SIZE: usize = if cfg!(target_os = "espidf") {
+         512
+     } else {
+         8 * 1024
+     };
+     let mut buffer = [0u8; FIRST_BUF_SIZE];
+@@ -144,7 +144,8 @@
+         Err(e) => return Err(e),
+     }
+ 
+-    // but optimize buffer size also for large file
+-    let mut buffer = vec![0u8; 4 * FIRST_BUF_SIZE]; //stack array makes code path for smaller file slower
++    // Sequential read/write plateau on Linux is 256 KiB.
++    let mut buffer = vec![0u8; 256 * 1024];
+     loop {
+         match input.read(&mut buffer) {
+             Ok(0) => return Ok(len), // end of file
