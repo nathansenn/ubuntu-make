@@ -39,7 +39,7 @@ Stock isolated (`bench_resolute`, 32 MiB):
 
 Guest `read()` plateaus at **128–256 KiB**. 512 KiB is slightly worse.
 
-Correct `tar -b` A/B on the guest (32 MiB file): `-b20` 0.211 s, `-b512` 0.398 s (**0.53×**). TCG virtio is the wrong place to tune blocking factor.
+Correct `tar -b` A/B on the guest (two 32 MiB files): `cf` 0.556 s vs 0.576 s, `xf` 0.535 s vs 0.528 s (**~1.00×**). TCG virtio is the wrong place to tune blocking factor. A 256 MiB `cmp` pair hit the 2 GiB guest disk quota.
 
 ## Host Xeon (native), Resolute 26.04 sources
 
@@ -91,7 +91,7 @@ Host tmpfs 64 MiB create: 0.040 s vs 0.039 s (**1.03×**). Guest TCG: **0.53×**
 |---|---|---|
 | zlib 1.3.1 PCLMUL CRC + SSSE3 Adler | 4.52× / 6.71× | KEEP |
 | gzip 1.14 stored-block + dist=1 + `copy_block` + fixed tables + `UNALIGNED_OK` | 1.50× text, 12.2× random | KEEP |
-| tar `DEFAULT_BLOCKING` 512 | 1.03× host tmpfs; 0.53× TCG | KEEP (disk; not TCG) |
+| tar `DEFAULT_BLOCKING` 512 | 1.03× host tmpfs; ~1.00× TCG | KEEP (disk; not this runner) |
 | grep `GOOD_READSIZE_MIN` 256 KiB | fewer syscalls; read already plateaued | KEEP |
 | diffutils / git 256 KiB floors | fewer syscalls | KEEP |
 | rust-coreutils `yes` 16→256 KiB | ~1.00× warm | DISCARD |
